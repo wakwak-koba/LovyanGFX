@@ -1,187 +1,209 @@
 /*----------------------------------------------------------------------------/
-  Lovyan GFX library - LCD graphics library .
-  
-  support platform:
-    ESP32 (SPI/I2S) with Arduino/ESP-IDF
-    ATSAMD51 (SPI) with Arduino
-  
-Original Source:  
- https://github.com/lovyan03/LovyanGFX/  
+  Lovyan GFX - Graphics library for embedded devices.
 
-Licence:  
- [BSD](https://github.com/lovyan03/LovyanGFX/blob/master/license.txt)  
+Original Source:
+ https://github.com/lovyan03/LovyanGFX/
 
-Author:  
- [lovyan03](https://twitter.com/lovyan03)  
+Licence:
+ [FreeBSD](https://github.com/lovyan03/LovyanGFX/blob/master/license.txt)
 
-Contributors:  
- [ciniml](https://github.com/ciniml)  
- [mongonta0716](https://github.com/mongonta0716)  
- [tobozo](https://github.com/tobozo)  
+Author:
+ [lovyan03](https://twitter.com/lovyan03)
+
+Contributors:
+ [ciniml](https://github.com/ciniml)
+ [mongonta0716](https://github.com/mongonta0716)
+ [tobozo](https://github.com/tobozo)
 /----------------------------------------------------------------------------*/
-#ifndef LGFX_BASE_HPP_
-#define LGFX_BASE_HPP_
-
-#include "lgfx_common.hpp"
-#include "lgfx_fonts.hpp"
-
-#include <cmath>
-#include <string>
-#include <memory>
+#pragma once
 
 #if defined (ARDUINO)
-#include <Print.h>
+ #include <Print.h>
 #endif
+
+#include <cstdint>
+
+#include "platforms/common.hpp"
+#include "misc/enum.hpp"
+#include "misc/colortype.hpp"
+#include "misc/pixelcopy.hpp"
+#include "misc/DataWrapper.hpp"
+#include "lgfx_fonts.hpp"
+#include "Panel.hpp"
+#include "Light.hpp"
+#include "Touch.hpp"
 
 namespace lgfx
 {
- inline namespace v0
+ inline namespace v1
  {
 //----------------------------------------------------------------------------
-
-  class PanelCommon;
-  class TouchCommon;
-  class LGFX_Sprite;
-  class FileWrapper;
 
   class LGFXBase
 #if defined (ARDUINO)
   : public Print
 #endif
   {
-  friend LGFX_Sprite;
-  friend IFont;
   public:
-    LGFXBase() {}
-    virtual ~LGFXBase() {}
+    LGFXBase(void);
+    virtual ~LGFXBase(void) = default;
 
-// color param format:
-// rgb888 : std::uint32_t
-// rgb565 : std::uint16_t & std::int16_t & int
-// rgb332 : std::uint8_t
-    __attribute__ ((always_inline)) inline void setColor(std::uint8_t r, std::uint8_t g, std::uint8_t b) { _color.raw = _write_conv.convert(lgfx::color888(r,g,b)); }
-    template<typename T> __attribute__ ((always_inline)) inline void setColor(T color) { _color.raw = _write_conv.convert(color); }
-                         __attribute__ ((always_inline)) inline void setRawColor(std::uint32_t c) { _color.raw = c; }
+#define LGFX_INLINE                        __attribute__ ((always_inline)) inline
+#define LGFX_INLINE_T template<typename T> __attribute__ ((always_inline)) inline
 
-    template<typename T> __attribute__ ((always_inline)) inline void setBaseColor(T c) { _base_rgb888 = convert_to_rgb888(c); }
-    std::uint32_t getBaseColor(void) const { return _base_rgb888; }
+    LGFX_INLINE static constexpr std::uint8_t  color332(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color332(r, g, b); }
+    LGFX_INLINE static constexpr std::uint16_t color565(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color565(r, g, b); }
+    LGFX_INLINE static constexpr std::uint32_t color888(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color888(r, g, b); }
+    LGFX_INLINE static constexpr std::uint16_t swap565( std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::swap565( r, g, b); }
+    LGFX_INLINE static constexpr std::uint32_t swap888( std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::swap888( r, g, b); }
+    LGFX_INLINE static constexpr std::uint8_t  color16to8(std::uint32_t rgb565) { return lgfx::convert_rgb565_to_rgb332(rgb565); }
+    LGFX_INLINE static constexpr std::uint16_t color8to16(std::uint32_t rgb332) { return lgfx::convert_rgb332_to_rgb565(rgb332); }
 
-// AdafruitGFX compatible functions.
-// However, startWrite and endWrite have an internal counter and are executed when the counter is 0.
-// If you do not want to the counter, call the transaction function directly.
-    __attribute__ ((always_inline)) inline void startWrite(void) {                           if (1 == ++_transaction_count) beginTransaction(); }
-    __attribute__ ((always_inline)) inline void endWrite(void)   { if (_transaction_count) { if (1 == _transaction_count) { endTransaction(); } --_transaction_count; } }
-    __attribute__ ((always_inline)) inline void writePixel(std::int32_t x, std::int32_t y)  { if (x >= _clip_l && x <= _clip_r && y >= _clip_t && y <= _clip_b) writeFillRect_impl(x, y, 1, 1); }
-    template<typename T> inline void writePixel    ( std::int32_t x, std::int32_t y                                , const T& color) { setColor(color); writePixel    (x, y      ); }
-    template<typename T> inline void writeFastVLine( std::int32_t x, std::int32_t y                , std::int32_t h, const T& color) { setColor(color); writeFastVLine(x, y   , h); }
-                                void writeFastVLine( std::int32_t x, std::int32_t y                , std::int32_t h);
-    template<typename T> inline void writeFastHLine( std::int32_t x, std::int32_t y, std::int32_t w                , const T& color) { setColor(color); writeFastHLine(x, y, w   ); }
-                                void writeFastHLine( std::int32_t x, std::int32_t y, std::int32_t w);
-    template<typename T> inline void writeFillRect ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) { setColor(color); writeFillRect (x, y, w, h); }
-                                void writeFillRect ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
-    template<typename T> inline void writeColor    ( const T& color, std::int32_t length) {      if (0 >= length) return; setColor(color);    pushBlock_impl(length); }
-    template<typename T> inline void writeFillRectPreclipped( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) { setColor(color); writeFillRect_impl (x, y, w, h); }
-                                void writeFillRectPreclipped( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h)                 {                  writeFillRect_impl (x, y, w, h); }
+    LGFX_INLINE   void setColor(std::uint8_t r, std::uint8_t g, std::uint8_t b) { setColor(lgfx::color888(r,g,b)); }
+    LGFX_INLINE_T void setColor(T color) { setRawColor(_write_conv.convert(color)); }
+    LGFX_INLINE   void setRawColor(std::uint32_t c) { *((std::uint32_t*)&_color) = c; }
+    LGFX_INLINE   std::uint32_t getRawColor(void) const { return *((std::uint32_t*)&_color); }
+    LGFX_INLINE_T void setBaseColor(T c) { _base_rgb888 = convert_to_rgb888(c); }
+    LGFX_INLINE   std::uint32_t getBaseColor(void) const { return _base_rgb888; }
+    LGFX_INLINE   color_conv_t* getColorConverter(void) { return &_write_conv; }
+    LGFX_INLINE   color_depth_t getColorDepth(void) const { return _write_conv.depth; }
 
+    LGFX_INLINE   void startWrite(bool transaction = true) { _panel->startWrite(transaction); }
+    LGFX_INLINE   void endWrite(void)                      { _panel->endWrite(); }
+    LGFX_INLINE   void beginTransaction(void)              { _panel->beginTransaction(); }
+    LGFX_INLINE   void endTransaction(void)                { _panel->endTransaction(); }
+    LGFX_INLINE   std::uint32_t getStartCount(void) const  { return _panel->getStartCount(); }
 
-    __attribute__ ((always_inline)) inline void drawPixel( std::int32_t x, std::int32_t y ) { if (x >= _clip_l && x <= _clip_r && y >= _clip_t && y <= _clip_b) drawPixel_impl(x, y); }
-    template<typename T> inline void drawPixel       ( std::int32_t x, std::int32_t y                                                , const T& color) { setColor(color); drawPixel    (x, y         ); }
-    template<typename T> inline void drawFastVLine   ( std::int32_t x, std::int32_t y                , std::int32_t h                , const T& color) { setColor(color); drawFastVLine(x, y   , h   ); }
-                                void drawFastVLine   ( std::int32_t x, std::int32_t y                , std::int32_t h);
-    template<typename T> inline void drawFastHLine   ( std::int32_t x, std::int32_t y, std::int32_t w                                , const T& color) { setColor(color); drawFastHLine(x, y, w      ); }
-                                void drawFastHLine   ( std::int32_t x, std::int32_t y, std::int32_t w);
-    template<typename T> inline void fillRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h                , const T& color) { setColor(color); fillRect     (x, y, w, h   ); }
-                                void fillRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
-    template<typename T> inline void drawRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h                , const T& color) { setColor(color); drawRect     (x, y, w, h   ); }
-                                void drawRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
-    template<typename T> inline void drawRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r, const T& color) { setColor(color); drawRoundRect(x, y, w, h, r); }
-                                void drawRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r);
-    template<typename T> inline void fillRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r, const T& color) { setColor(color); fillRoundRect(x, y, w, h, r); }
-                                void fillRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r);
-    template<typename T> inline void drawCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r, const T& color) { setColor(color); drawCircle   (x, y      , r); }
-                                void drawCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r);
-    template<typename T> inline void fillCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r, const T& color) { setColor(color); fillCircle   (x, y      , r); }
-                                void fillCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r);
-    template<typename T> inline void drawEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry              , const T& color) { setColor(color); drawEllipse  (x, y, rx, ry ); }
-                                void drawEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry);     
-    template<typename T> inline void fillEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry              , const T& color) { setColor(color); fillEllipse  (x, y, rx, ry ); }
-                                void fillEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry);
-    template<typename T> inline void drawLine        ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1            , const T& color)  { setColor(color); drawLine(    x0, y0, x1, y1        ); }
-                                void drawLine        ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1);
-    template<typename T> inline void drawTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawTriangle(x0, y0, x1, y1, x2, y2); }
-                                void drawTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
-    template<typename T> inline void fillTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); fillTriangle(x0, y0, x1, y1, x2, y2); }
-                                void fillTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
-    template<typename T> inline void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawBezier(x0, y0, x1, y1, x2, y2); }
-                                void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
-    template<typename T> inline void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, std::int32_t x3, std::int32_t y3, const T& color)  { setColor(color); drawBezier(x0, y0, x1, y1, x2, y2, x3, y3); }
-                                void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, std::int32_t x3, std::int32_t y3);
-    template<typename T> inline void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawBezierHelper(x0, y0, x1, y1, x2, y2); }
-                                void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
-    template<typename T> inline void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); drawArc( x, y, r0, r1, angle0, angle1); }
-                                void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
-    template<typename T> inline void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); fillArc( x, y, r0, r1, angle0, angle1); }
-                                void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
-    template<typename T> inline void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername                 , const T& color)  { setColor(color); drawCircleHelper(x, y, r, cornername    ); }
-                                void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername);
-    template<typename T> inline void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta, const T& color)  { setColor(color); fillCircleHelper(x, y, r, corners, delta); }
-                                void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta);
+    LGFX_INLINE   void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) { _panel->setWindow(xs, ys, xe, ye); }
+    LGFX_INLINE   void writePixel(std::int32_t x, std::int32_t y)  { if (x >= _clip_l && x <= _clip_r && y >= _clip_t && y <= _clip_b) writeFillRectPreclipped(x, y, 1, 1); }
+    LGFX_INLINE_T void writePixel      ( std::int32_t x, std::int32_t y                                , const T& color) { setColor(color); writePixel    (x, y      ); }
+    LGFX_INLINE_T void writeFastVLine  ( std::int32_t x, std::int32_t y                , std::int32_t h, const T& color) { setColor(color); writeFastVLine(x, y   , h); }
+                  void writeFastVLine  ( std::int32_t x, std::int32_t y                , std::int32_t h);
+    LGFX_INLINE_T void writeFastHLine  ( std::int32_t x, std::int32_t y, std::int32_t w                , const T& color) { setColor(color); writeFastHLine(x, y, w   ); }
+                  void writeFastHLine  ( std::int32_t x, std::int32_t y, std::int32_t w);
+    LGFX_INLINE_T void writeFillRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) { setColor(color); writeFillRect (x, y, w, h); }
+                  void writeFillRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
+    LGFX_INLINE_T void writeFillRectPreclipped( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) { setColor(color); writeFillRectPreclipped(x, y, w, h); }
+    LGFX_INLINE   void writeFillRectPreclipped( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h)                 { _panel->writeFillRectPreclipped(x, y, w, h, getRawColor()); }
+    LGFX_INLINE_T void writeColor      ( const T& color, std::uint32_t length) { if (0 == length) return; setColor(color);               _panel->writeBlock(getRawColor(), length); }
+    LGFX_INLINE_T void pushBlock       ( const T& color, std::uint32_t length) { if (0 == length) return; setColor(color); startWrite(); _panel->writeBlock(getRawColor(), length); endWrite(); }
+    LGFX_INLINE   void drawPixel       ( std::int32_t x, std::int32_t y) { if (x >= _clip_l && x <= _clip_r && y >= _clip_t && y <= _clip_b) { _panel->drawPixelPreclipped(x, y, getRawColor()); } }
+    LGFX_INLINE_T void drawPixel       ( std::int32_t x, std::int32_t y                                                , const T& color) { setColor(color); drawPixel    (x, y         ); }
+    LGFX_INLINE_T void drawFastVLine   ( std::int32_t x, std::int32_t y                , std::int32_t h                , const T& color) { setColor(color); drawFastVLine(x, y   , h   ); }
+                  void drawFastVLine   ( std::int32_t x, std::int32_t y                , std::int32_t h);
+    LGFX_INLINE_T void drawFastHLine   ( std::int32_t x, std::int32_t y, std::int32_t w                                , const T& color) { setColor(color); drawFastHLine(x, y, w      ); }
+                  void drawFastHLine   ( std::int32_t x, std::int32_t y, std::int32_t w);
+    LGFX_INLINE_T void fillRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h                , const T& color) { setColor(color); fillRect     (x, y, w, h   ); }
+                  void fillRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
+    LGFX_INLINE_T void drawRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h                , const T& color) { setColor(color); drawRect     (x, y, w, h   ); }
+                  void drawRect        ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
+    LGFX_INLINE_T void drawRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r, const T& color) { setColor(color); drawRoundRect(x, y, w, h, r); }
+                  void drawRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r);
+    LGFX_INLINE_T void fillRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r, const T& color) { setColor(color); fillRoundRect(x, y, w, h, r); }
+                  void fillRoundRect   ( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::int32_t r);
+    LGFX_INLINE_T void drawCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r, const T& color) { setColor(color); drawCircle   (x, y      , r); }
+                  void drawCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r);
+    LGFX_INLINE_T void fillCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r, const T& color) { setColor(color); fillCircle   (x, y      , r); }
+                  void fillCircle      ( std::int32_t x, std::int32_t y                                , std::int32_t r);
+    LGFX_INLINE_T void drawEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry              , const T& color) { setColor(color); drawEllipse  (x, y, rx, ry ); }
+                  void drawEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry);
+    LGFX_INLINE_T void fillEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry              , const T& color) { setColor(color); fillEllipse  (x, y, rx, ry ); }
+                  void fillEllipse     ( std::int32_t x, std::int32_t y, std::int32_t rx, std::int32_t ry);
+    LGFX_INLINE_T void drawLine        ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1            , const T& color) { setColor(color); drawLine     (x0,y0,x1, y1 ); }
+                  void drawLine        ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1);
+    LGFX_INLINE_T void drawTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawTriangle(x0, y0, x1, y1, x2, y2); }
+                  void drawTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
+    LGFX_INLINE_T void fillTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); fillTriangle(x0, y0, x1, y1, x2, y2); }
+                  void fillTriangle    ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
+    LGFX_INLINE_T void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawBezier(x0, y0, x1, y1, x2, y2); }
+                  void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
+    LGFX_INLINE_T void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, std::int32_t x3, std::int32_t y3, const T& color)  { setColor(color); drawBezier(x0, y0, x1, y1, x2, y2, x3, y3); }
+                  void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, std::int32_t x3, std::int32_t y3);
+    LGFX_INLINE_T void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawBezierHelper(x0, y0, x1, y1, x2, y2); }
+                  void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
+    LGFX_INLINE_T void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); drawArc( x, y, r0, r1, angle0, angle1); }
+                  void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
+    LGFX_INLINE_T void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); fillArc( x, y, r0, r1, angle0, angle1); }
+                  void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
+    LGFX_INLINE_T void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername                 , const T& color)  { setColor(color); drawCircleHelper(x, y, r, cornername    ); }
+                  void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername);
+    LGFX_INLINE_T void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta, const T& color)  { setColor(color); fillCircleHelper(x, y, r, corners, delta); }
+                  void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta);
 
-    template<typename T> inline void floodFill( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
-                                void floodFill( std::int32_t x, std::int32_t y                );
-    template<typename T> inline void paint    ( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
-                         inline void paint    ( std::int32_t x, std::int32_t y                ) {                  floodFill(x, y); }
+    LGFX_INLINE_T void floodFill( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
+                  void floodFill( std::int32_t x, std::int32_t y                );
+    LGFX_INLINE_T void paint    ( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
+    LGFX_INLINE   void paint    ( std::int32_t x, std::int32_t y                ) {                  floodFill(x, y); }
 
-    template<typename T> inline void fillAffine(const float matrix[6], std::int32_t w, std::int32_t h, const T& color) { setColor(color); fillAffine(matrix, w, h); }
-                                void fillAffine(const float matrix[6], std::int32_t w, std::int32_t h);
+    LGFX_INLINE_T void fillAffine(const float matrix[6], std::int32_t w, std::int32_t h, const T& color) { setColor(color); fillAffine(matrix, w, h); }
+                  void fillAffine(const float matrix[6], std::int32_t w, std::int32_t h);
 
-    template<typename T> inline void drawGradientHLine( std::int32_t x, std::int32_t y, std::int32_t w, const T& colorstart, const T& colorend ) { drawGradientLine( x, y, x + w - 1, y, colorstart, colorend ); }
-    template<typename T> inline void drawGradientVLine( std::int32_t x, std::int32_t y, std::int32_t h, const T& colorstart, const T& colorend ) { drawGradientLine( x, y, x, y + h - 1, colorstart, colorend ); }
-    template<typename T> inline void drawGradientLine ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, const T& colorstart, const T& colorend ) { draw_gradient_line( x0, y0, x1, y1, convert_to_rgb888(colorstart), convert_to_rgb888(colorend) ); }
+    LGFX_INLINE_T void drawGradientHLine( std::int32_t x, std::int32_t y, std::int32_t w, const T& colorstart, const T& colorend ) { drawGradientLine( x, y, x + w - 1, y, colorstart, colorend ); }
+    LGFX_INLINE_T void drawGradientVLine( std::int32_t x, std::int32_t y, std::int32_t h, const T& colorstart, const T& colorend ) { drawGradientLine( x, y, x, y + h - 1, colorstart, colorend ); }
+    LGFX_INLINE_T void drawGradientLine ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, const T& colorstart, const T& colorend ) { draw_gradient_line( x0, y0, x1, y1, convert_to_rgb888(colorstart), convert_to_rgb888(colorend) ); }
 
-    template<typename T> inline void fillScreen  ( const T& color) { setColor(color); fillRect(0, 0, _width, _height); }
-                         inline void fillScreen  ( void )          {                  fillRect(0, 0, _width, _height); }
+    LGFX_INLINE_T void fillScreen  ( const T& color) { setColor(color); fillRect(0, 0, width(), height()); }
+    LGFX_INLINE   void fillScreen  ( void )          {                  fillRect(0, 0, width(), height()); }
 
-    template<typename T> inline void clear       ( const T& color) { setBaseColor(color); clear(); }
-                         inline void clear       ( void )          { setColor(_base_rgb888); fillScreen(); }
-    template<typename T> inline void clearDisplay( const T& color) { setBaseColor(color); clear(); }
-                         inline void clearDisplay( void )          { setColor(_base_rgb888); fillScreen(); }
+    LGFX_INLINE_T void clear       ( const T& color) { setBaseColor(color); clear(); }
+    LGFX_INLINE   void clear       ( void )          { setColor(_base_rgb888); fillScreen(); }
+    LGFX_INLINE_T void clearDisplay( const T& color) { setBaseColor(color); clear(); }
+    LGFX_INLINE   void clearDisplay( void )          { setColor(_base_rgb888); fillScreen(); }
 
-    template<typename T> inline void pushBlock  ( const T& color, std::int32_t length) { if (0 >= length) return; setColor(color); startWrite(); pushBlock_impl(length); endWrite(); }
+    LGFX_INLINE   void  setPivot(float x, float y) { _xpivot = x; _ypivot = y; }
+    LGFX_INLINE   float getPivotX(void) const { return _xpivot; }
+    LGFX_INLINE   float getPivotY(void) const { return _ypivot; }
 
+    LGFX_INLINE   std::int32_t width (void) const { return _panel->width(); }
+    LGFX_INLINE   std::int32_t height(void) const { return _panel->height(); }
+    LGFX_INLINE   bool hasPalette (void) const { return _palette_count; }
+    LGFX_INLINE   std::uint32_t getPaletteCount(void) const { return _palette_count; }
+    LGFX_INLINE   RGBColor*     getPalette(void) const { return getPalette_impl(); }
+    LGFX_INLINE   bool isReadable(void) const { return _panel->isReadable(); }
+    LGFX_INLINE   bool isEPD(void) const { return _panel->isEpd(); }
+    LGFX_INLINE   bool getSwapBytes(void) const { return _swapBytes; }
+    LGFX_INLINE   void setSwapBytes(bool swap) { _swapBytes = swap; }
+    LGFX_INLINE   bool isBusShared(void) const { return _panel->isBusShared(); }
+    [[deprecated("use isBusShared()")]]
+    LGFX_INLINE   bool isSPIShared(void) const { return _panel->isBusShared(); }
+                  void display(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
+    LGFX_INLINE   void display(void) { _panel->display(0, 0, 0, 0); }
+    LGFX_INLINE   void waitDisplay(void) { _panel->waitDisplay(); }
+    LGFX_INLINE   bool displayBusy(void) { return _panel->displayBusy(); }
+    LGFX_INLINE   void setAutoDisplay(bool flg) { _panel->setAutoDisplay(flg); }
+    LGFX_INLINE   void initDMA(void) { _panel->initDMA(); }
+    LGFX_INLINE   void waitDMA(void) { _panel->waitDMA(); }
+    LGFX_INLINE   bool dmaBusy(void) { return _panel->dmaBusy(); }
 
-    __attribute__ ((always_inline)) inline static std::uint8_t  color332(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color332(r, g, b); }
-    __attribute__ ((always_inline)) inline static std::uint16_t color565(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color565(r, g, b); }
-    __attribute__ ((always_inline)) inline static std::uint32_t color888(std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::color888(r, g, b); }
-    __attribute__ ((always_inline)) inline static std::uint16_t swap565( std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::swap565( r, g, b); }
-    __attribute__ ((always_inline)) inline static std::uint32_t swap888( std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::swap888( r, g, b); }
-    __attribute__ ((always_inline)) inline static std::uint8_t  color16to8(std::uint32_t rgb565) { return lgfx::convert_rgb565_to_rgb332(rgb565); }
-    __attribute__ ((always_inline)) inline static std::uint16_t color8to16(std::uint32_t rgb332) { return lgfx::convert_rgb332_to_rgb565(rgb332); }
+    LGFX_INLINE_T void setScrollRect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) { setBaseColor(color); setScrollRect(x, y, w, h); }
 
-    __attribute__ ((always_inline)) inline void setPivot(float x, float y) { _xpivot = x; _ypivot = y; }
-    __attribute__ ((always_inline)) inline float getPivotX(void) const { return _xpivot; }
-    __attribute__ ((always_inline)) inline float getPivotY(void) const { return _ypivot; }
+    LGFX_INLINE_T void writePixels(const T *data, std::int32_t len)                        { auto pc = create_pc_fast(data      ); _panel->writePixels(&pc, len); }
+    LGFX_INLINE   void writePixels(const std::uint16_t* data, std::int32_t len, bool swap) { auto pc = create_pc_fast(data, swap); _panel->writePixels(&pc, len); }
+    LGFX_INLINE   void writePixels(const void*          data, std::int32_t len, bool swap) { auto pc = create_pc_fast(data, swap); _panel->writePixels(&pc, len); }
 
-    __attribute__ ((always_inline)) inline std::int32_t width        (void) const { return _width; }
-    __attribute__ ((always_inline)) inline std::int32_t height       (void) const { return _height; }
-    __attribute__ ((always_inline)) inline std::int_fast8_t getRotation(void) const { return getRotation_impl(); }
-    __attribute__ ((always_inline)) inline color_depth_t getColorDepth(void) const { return _write_conv.depth; }
-    __attribute__ ((always_inline)) inline color_conv_t* getColorConverter(void) { return &_write_conv; }
-    __attribute__ ((always_inline)) inline RGBColor*     getPalette(void) const { return getPalette_impl(); }
-    __attribute__ ((always_inline)) inline std::uint32_t getPaletteCount(void) const { return _palette_count; }
-    __attribute__ ((always_inline)) inline bool hasPalette    (void) const { return _palette_count; }
-    __attribute__ ((always_inline)) inline bool isSPIShared(void) const { return _spi_shared; }
-    __attribute__ ((always_inline)) inline bool isReadable(void) const { return isReadable_impl(); }
-    __attribute__ ((always_inline)) inline bool getSwapBytes    (void) const { return _swapBytes; }
-    __attribute__ ((always_inline)) inline void setSwapBytes(bool swap) { _swapBytes = swap; }
-    __attribute__ ((always_inline)) inline void setSPIShared(bool shared) { _spi_shared = shared; }
+    LGFX_INLINE_T void pushPixels(T*                   data, std::int32_t len           ) { startWrite(); writePixels(data, len      ); endWrite(); }
+    LGFX_INLINE   void pushPixels(const std::uint16_t* data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
+    LGFX_INLINE   void pushPixels(const void*          data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
 
-    __attribute__ ((always_inline)) inline void beginTransaction(void) { beginTransaction_impl(); }
-    __attribute__ ((always_inline)) inline void endTransaction(void)   { endTransaction_impl(); }
-    __attribute__ ((always_inline)) inline void initDMA(void)  { initDMA_impl(); }
-    __attribute__ ((always_inline)) inline void waitDMA(void) { waitDMA_impl(); }
-    __attribute__ ((always_inline)) inline bool dmaBusy(void)  { return dmaBusy_impl(); }
-    __attribute__ ((always_inline)) inline void setWindow(std::int32_t xs, std::int32_t ys, std::int32_t xe, std::int32_t ye) { setWindow_impl(xs, ys, xe, ye); }
+    LGFX_INLINE_T void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& color                    ) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(color)); }
+    LGFX_INLINE_T void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
+    LGFX_INLINE_T void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& color                    ) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(color)); }
+    LGFX_INLINE_T void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
+
+    LGFX_INLINE_T
+    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, lgfx::color_depth_t colordepth = lgfx::rgb332_1Byte)
+    {
+      auto pc = create_pc_fast(data, palette, colordepth);
+      _panel->writePixels(&pc, len);
+    }
+
+#undef LGFX_INLINE
+#undef LGFX_INLINE_T
+
+    std::uint8_t getRotation(void) const { return _panel->getRotation(); }
+    void setRotation(std::uint_fast8_t rotation);
+    void setColorDepth(int bits) { setColorDepth((color_depth_t)(bits & color_depth_t::bit_mask));}
+    void setColorDepth(color_depth_t depth);
 
     void setAddrWindow(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
 
@@ -189,39 +211,9 @@ namespace lgfx
     void getClipRect(std::int32_t *x, std::int32_t *y, std::int32_t *w, std::int32_t *h);
     void clearClipRect(void);
 
-    template<typename T>
-    void setScrollRect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T& color) {
-      _base_rgb888 = convert_to_rgb888(color);
-      setScrollRect(x, y, w, h);
-    }
     void setScrollRect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
     void getScrollRect(std::int32_t *x, std::int32_t *y, std::int32_t *w, std::int32_t *h);
     void clearScrollRect(void);
-
-    __attribute__ ((always_inline)) inline void pushPixelsDMA( const void* data, std::int32_t len) { if (len < 0) return; startWrite(); writePixelsDMA_impl(data, len); endWrite(); }
-    __attribute__ ((always_inline)) inline void writePixelsDMA(const void* data, std::int32_t len) { if (len < 0) return;               writePixelsDMA_impl(data, len);             }
-
-    template<typename T>
-    __attribute__ ((always_inline)) inline void pushPixels(T*                   data, std::int32_t len           ) { startWrite(); writePixels(data, len      ); endWrite(); }
-    __attribute__ ((always_inline)) inline void pushPixels(const std::uint16_t* data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
-    __attribute__ ((always_inline)) inline void pushPixels(const void*          data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
-
-    template<typename T>
-    void writePixels(const T *data, std::int32_t len)                        { auto pc = create_pc_fast(data      ); writePixels_impl(len, &pc); }
-    void writePixels(const std::uint16_t* data, std::int32_t len, bool swap) { auto pc = create_pc_fast(data, swap); writePixels_impl(len, &pc); }
-    void writePixels(const void*          data, std::int32_t len, bool swap) { auto pc = create_pc_fast(data, swap); writePixels_impl(len, &pc); }
-
-    template<typename T>
-    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, lgfx::color_depth_t colordepth = lgfx::rgb332_1Byte)
-    {
-      auto pc = create_pc_fast(data, palette, colordepth);
-      writePixels_impl(len, &pc);
-    }
-
-    template<typename T> void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& color                    ) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(color)); }
-    template<typename T> void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
-    template<typename T> void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& color                    ) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(color)); }
-    template<typename T> void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
 
     template<typename T>
     void pushImage(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T* data)
@@ -266,6 +258,7 @@ namespace lgfx
     }
 
     void pushImage(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, pixelcopy_t *param, bool use_dma = false);
+
 
 //----------------------------------------------------------------------------
 
@@ -390,12 +383,12 @@ namespace lgfx
     /// read RGB565 16bit color
     std::uint16_t readPixel(std::int32_t x, std::int32_t y)
     {
-      if (x < _clip_l || x > _clip_r || y < _clip_t || y > _clip_b) return 0;
+      if (x < 0 || x >= width() || y < 0 || y >= height()) return 0;
 
       pixelcopy_t p(nullptr, swap565_t::depth, _read_conv.depth, false, getPalette());
-      std::uint_fast16_t data = 0;
+      std::uint16_t data = 0;
 
-      readRect_impl(x, y, 1, 1, &data, &p);
+      _panel->readRect(x, y, 1, 1, &data, &p);
 
       return __builtin_bswap16(data);
     }
@@ -404,11 +397,11 @@ namespace lgfx
     RGBColor readPixelRGB(std::int32_t x, std::int32_t y)
     {
       RGBColor data[1];
-      if (x < _clip_l || x > _clip_r || y < _clip_t || y > _clip_b) return data[0];
+      if (x < 0 || x >= width() || y < 0 || y >= height()) return data[0];
 
       pixelcopy_t p(nullptr, bgr888_t::depth, _read_conv.depth, false, getPalette());
 
-      readRect_impl(x, y, 1, 1, data, &p);
+      _panel->readRect(x, y, 1, 1, data, &p);
 
       return data[0];
     }
@@ -542,7 +535,7 @@ namespace lgfx
       return 0;
     }
 
-    //[[deprecated("use setFont(&fonts::Font)")]]
+    /// [[deprecated("use setFont(&fonts::Font)")]]
     void setTextFont(int f)
     {
       if (f == 1 && _font && _font->getType() == IFont::font_type_t::ft_gfx) return;
@@ -569,9 +562,6 @@ namespace lgfx
     void showFont(std::uint32_t td);
 
     void cp437(bool enable = true) { _text_style.cp437 = enable; }  // AdafruitGFX compatible.
-
-    epd_mode_t setEpdMode(epd_mode_t flg) { _epd_mode = flg; return flg; }
-    epd_mode_t getEpdMode(void) const { return _epd_mode; }
 
     void setAttribute(attribute_t attr_id, std::uint8_t param);
     std::uint8_t getAttribute(attribute_t attr_id);
@@ -690,9 +680,9 @@ namespace lgfx
     [[deprecated("use pushImage")]] void pushRect( std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, const T* data) { pushImage(x, y, w, h, data); }
 
     template<typename T>
-    [[deprecated("use pushBlock")]] void pushColor(const T& color, std::int32_t length) { if (0 >= length) return; setColor(color); startWrite(); pushBlock_impl(length); endWrite(); }
+    [[deprecated("use pushBlock")]] void pushColor(const T& color, std::uint32_t length) { if (0 != length) { setColor(color); startWrite(); _panel->writeBlock(getRawColor(), length); endWrite(); } }
     template<typename T>
-    [[deprecated("use pushBlock")]] void pushColor(const T& color                     ) {                          setColor(color); startWrite(); pushBlock_impl(1);      endWrite(); }
+    [[deprecated("use pushBlock")]] void pushColor(const T& color                     ) {                     setColor(color); startWrite(); _panel->writeBlock(getRawColor(), 1);      endWrite(); }
 
     template<typename T>
     [[deprecated("use pushPixels")]] void pushColors(T*                   data, std::int32_t len           ) { startWrite(); writePixels(data, len            ); endWrite(); }
@@ -703,32 +693,29 @@ namespace lgfx
     [[deprecated("use pushPixels")]] void pushColors(const std::uint16_t* data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
 
 //----------------------------------------------------------------------------
-//----------------------------------------------------------------------------
 
   protected:
-    bool _auto_display = true;
-    PanelCommon* _panel = nullptr;
-    TouchCommon* _touch = nullptr;
-    FileWrapper* _font_file = nullptr;
-    std::uint32_t _transaction_count = 0;
-    std::int32_t _width = 0, _height = 0;
-    std::int32_t  _sx, _sy, _sw, _sh; // for scroll zone
 
+    virtual RGBColor* getPalette_impl(void) const { return nullptr; }
+    void prepareTmpTransaction(DataWrapper* data);
+
+    IPanel* _panel = nullptr;
+
+    std::int32_t _sx = 0, _sy = 0, _sw = 0, _sh = 0; // for scroll zone
     std::int32_t _clip_l = 0, _clip_r = -1, _clip_t = 0, _clip_b = -1; // clip rect
+
     std::uint32_t _base_rgb888 = 0;  // gap fill colour for clear and scroll zone 
     raw_color_t _color = 0xFFFFFFU;
 
     color_conv_t _write_conv;
     color_conv_t _read_conv;
 
-    std::uint32_t _palette_count = 0;
+    std::uint16_t _palette_count = 0;
 
-    float _xpivot;   // x pivot point coordinate
-    float _ypivot;   // x pivot point coordinate
+    float _xpivot = 0.0f;   // x pivot point coordinate
+    float _ypivot = 0.0f;   // x pivot point coordinate
 
-    bool _spi_shared = true;
     bool _swapBytes = false;
-    epd_mode_t _epd_mode = epd_mode_t::epd_quality;
 
     enum utf8_decode_state_t
     { utf8_state0 = 0
@@ -748,6 +735,7 @@ namespace lgfx
     const IFont* _font = &fonts::Font0;
 
     std::shared_ptr<RunTimeFont> _runtime_font;  // run-time generated font
+    DataWrapper* _font_file = nullptr;
     PointerWrapper _font_data;
 
     bool _textwrap_x = true;
@@ -755,7 +743,6 @@ namespace lgfx
     bool _textscroll = false;
 
     __attribute__ ((always_inline)) inline static bool _adjust_abs(std::int32_t& x, std::int32_t& w) { if (w < 0) { x += w + 1; w = -w; } return !w; }
-
     static bool _adjust_width(std::int32_t& x, std::int32_t& dx, std::int32_t& dw, std::int32_t left, std::int32_t width)
     {
       if (x < left) { dx = -x; dw += x; x = left; }
@@ -770,12 +757,12 @@ namespace lgfx
     {
       auto dst_depth = _write_conv.depth;
       pixelcopy_t pc(data, dst_depth, get_depth<T>::value, hasPalette());
-      if (hasPalette() || dst_depth < rgb332_1Byte)
+      if (hasPalette() || pc.dst_bits < 8)
       {
         pc.fp_copy = pixelcopy_t::copy_bit_fast;
       }
       else
-      if (dst_depth > rgb565_2Byte)
+      if (pc.dst_bits > 16)
       {
         if (     dst_depth == rgb888_3Byte) { pc.fp_copy = pixelcopy_t::copy_rgb_fast<bgr888_t, T>; }
         else if (dst_depth == rgb666_3Byte) { pc.fp_copy = pixelcopy_t::copy_rgb_fast<bgr666_t, T>; }
@@ -793,13 +780,13 @@ namespace lgfx
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc_fast(const void          *data) { return create_pc_fast(data, _swapBytes); }
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc_fast(const std::uint16_t *data, bool swap)
     {
-      return swap && !hasPalette() && _write_conv.depth >= 8
+      return swap && !hasPalette() && _write_conv.bits >= 8
            ? create_pc_fast(reinterpret_cast<const rgb565_t* >(data))
            : create_pc_fast(reinterpret_cast<const swap565_t*>(data));
     }
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc_fast(const void *data, bool swap)
     {
-      return swap && !hasPalette() && _write_conv.depth >= 8
+      return swap && !hasPalette() && _write_conv.bits >= 8
            ? create_pc_fast(reinterpret_cast<const rgb888_t*>(data))
            : create_pc_fast(reinterpret_cast<const bgr888_t*>(data));
     }
@@ -814,15 +801,17 @@ namespace lgfx
       pixelcopy_t pc;
       pc.src_data  = data   ;
       pc.palette   = palette;
-      pc.src_bits  = src_depth > 8 ? (src_depth + 7) & ~7 : src_depth;
-      pc.dst_bits  = dst_depth > 8 ? (dst_depth + 7) & ~7 : dst_depth;
+      //pc.src_bits  = src_depth > 8 ? (src_depth + 7) & ~7 : src_depth;
+      //pc.dst_bits  = dst_depth > 8 ? (dst_depth + 7) & ~7 : dst_depth;
+      pc.src_bits  = src_depth & color_depth_t::bit_mask;
+      pc.dst_bits  = dst_depth & color_depth_t::bit_mask;
       pc.src_mask  = (1 << pc.src_bits) - 1 ;
       pc.dst_mask  = (1 << pc.dst_bits) - 1 ;
       pc.no_convert= src_depth == dst_depth;
 //*/
-      if (hasPalette() || dst_depth < rgb332_1Byte)
+      if (hasPalette() || pc.dst_bits < 8)
       {
-        if (palette && (dst_depth == rgb332_1Byte) && (src_depth == rgb332_1Byte))
+        if (palette && (pc.src_bits == 8) && (pc.dst_bits == 8))
         {
           pc.fp_copy = pixelcopy_t::copy_rgb_fast<rgb332_t, rgb332_t>;
         }
@@ -833,7 +822,7 @@ namespace lgfx
       }
       else
       {
-        if (dst_depth > rgb565_2Byte)
+        if (pc.dst_bits > 16)
         {
           if (     dst_depth == rgb888_3Byte) { pc.fp_copy = pixelcopy_t::copy_palette_fast<bgr888_t, T>; }
           else if (dst_depth == rgb666_3Byte) { pc.fp_copy = pixelcopy_t::copy_palette_fast<bgr666_t, T>; }
@@ -866,13 +855,13 @@ namespace lgfx
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc(const void          *data) { return create_pc(data, _swapBytes); }
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc(const std::uint16_t *data, bool swap)
     {
-      return swap && !hasPalette() && _write_conv.depth >= 8
+      return swap && !hasPalette() && _write_conv.bits >= 8
            ? create_pc(reinterpret_cast<const rgb565_t* >(data))
            : create_pc(reinterpret_cast<const swap565_t*>(data));
     }
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc(const void *data, bool swap)
     {
-      return swap && !hasPalette() && _write_conv.depth >= 8
+      return swap && !hasPalette() && _write_conv.bits >= 8
            ? create_pc(reinterpret_cast<const rgb888_t*>(data))
            : create_pc(reinterpret_cast<const bgr888_t*>(data));
     }
@@ -906,13 +895,13 @@ namespace lgfx
     template<typename T> pixelcopy_t create_pc_tr(const void          *data, const T& transparent) { return create_pc_tr(data, transparent, _swapBytes); }
     template<typename T> pixelcopy_t create_pc_tr(const std::uint16_t *data, const T& transparent, bool swap)
     {
-      return swap && _write_conv.depth >= 8 && !hasPalette()
+      return swap && _write_conv.bits >= 8 && !hasPalette()
            ? create_pc_tr(reinterpret_cast<const rgb565_t* >(data), transparent)
            : create_pc_tr(reinterpret_cast<const swap565_t*>(data), transparent);
     }
     template<typename T> pixelcopy_t create_pc_tr(const void *data, const T& transparent, bool swap)
     {
-      return swap && _write_conv.depth >= 8 && !hasPalette()
+      return swap && _write_conv.bits >= 8 && !hasPalette()
            ? create_pc_tr(reinterpret_cast<const rgb888_t*>(data), transparent)
            : create_pc_tr(reinterpret_cast<const bgr888_t*>(data), transparent);
     }
@@ -926,7 +915,7 @@ namespace lgfx
     pixelcopy_t create_pc_palette(const void *data, const T *palette, lgfx::color_depth_t depth, std::uint32_t transparent = ~0u)
     {
       pixelcopy_t pc(data, getColorDepth(), depth, hasPalette(), palette, transparent);
-      if (!hasPalette() && palette && getColorDepth() >= 8)
+      if (!hasPalette() && palette && _write_conv.bits >= 8)
       {
         pc.fp_copy = pixelcopy_t::get_fp_copy_palette_affine<T>(getColorDepth());
       }
@@ -936,7 +925,7 @@ namespace lgfx
 
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint8_t *data, std::uint32_t raw_transparent = ~0u)
     {
-      return create_pc_antialias(reinterpret_cast<const rgb332_t*>(data), raw_transparent); 
+      return create_pc_antialias(reinterpret_cast<const rgb332_t*>(data), raw_transparent);
     }
     __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint16_t *data, std::uint32_t raw_transparent = ~0u)
     {
@@ -977,7 +966,7 @@ namespace lgfx
       {
         pc.fp_copy = pixelcopy_t::copy_palette_antialias<T>;
       }
-      else if (depth > rgb565_2Byte)
+      else if ((depth & color_depth_t::bit_mask) > 16)
       {
         if (depth == rgb888_3Byte) {
           pc.fp_copy = pixelcopy_t::copy_rgb_antialias<bgr888_t>;
@@ -1000,7 +989,6 @@ namespace lgfx
 
     static void make_rotation_matrix(float* result, float dst_x, float dst_y, float src_x, float src_y, float angle, float zoom_x, float zoom_y);
 
-    void writeRawColor( std::uint32_t color, std::int32_t length) { if (0 >= length) return; setRawColor(color); pushBlock_impl(length); }
     void read_rect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, void* dst, pixelcopy_t* param);
     void draw_gradient_line( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, uint32_t colorstart, uint32_t colorend );
     void fill_arc_helper(std::int32_t cx, std::int32_t cy, std::int32_t oradius, std::int32_t iradius, float start, float end);
@@ -1019,67 +1007,30 @@ namespace lgfx
     std::size_t printNumber(unsigned long n, std::uint8_t base);
     std::size_t printFloat(double number, std::uint8_t digits);
     std::size_t draw_string(const char *string, std::int32_t x, std::int32_t y, textdatum_t datum);
+    bool load_font(lgfx::DataWrapper* data);
 
     bool draw_bmp(DataWrapper* data, std::int32_t x, std::int32_t y, std::int32_t maxWidth, std::int32_t maxHeight, std::int32_t offX, std::int32_t offY, float scale_x, float scale_y, datum_t datum);
     bool draw_jpg(DataWrapper* data, std::int32_t x, std::int32_t y, std::int32_t maxWidth, std::int32_t maxHeight, std::int32_t offX, std::int32_t offY, float scale_x, float scale_y, datum_t datum);
     bool draw_png(DataWrapper* data, std::int32_t x, std::int32_t y, std::int32_t maxWidth, std::int32_t maxHeight, std::int32_t offX, std::int32_t offY, float scale_x, float scale_y, datum_t datum);
 
-
-    virtual void setWindow_impl(std::int32_t xs, std::int32_t ys, std::int32_t xe, std::int32_t ye) = 0;
-    virtual void writeFillRect_impl(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h) = 0;
-    virtual void drawPixel_impl(std::int32_t x, std::int32_t y) = 0;
-    virtual void copyRect_impl(std::int32_t dst_x, std::int32_t dst_y, std::int32_t w, std::int32_t h, std::int32_t src_x, std::int32_t src_y) = 0;
-    virtual void readRect_impl(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, void* dst, pixelcopy_t* param) = 0;
-    virtual void pushImage_impl(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, pixelcopy_t* param, bool use_dma) = 0;
-    virtual void pushImageARGB_impl(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, pixelcopy_t* param) = 0;
-    virtual void writePixels_impl(std::int32_t length, pixelcopy_t* param) = 0;
-    virtual void writePixelsDMA_impl(const void* data, std::int32_t length) = 0;
-    virtual void pushBlock_impl(std::int32_t len) = 0;
-    virtual bool isReadable_impl(void) const = 0;
-    virtual std::int_fast8_t getRotation_impl(void) const = 0;
-    virtual RGBColor* getPalette_impl(void) const { return nullptr; }
-
-    virtual void initDMA_impl(void) = 0;
-    virtual void waitDMA_impl(void) = 0;
-    virtual bool dmaBusy_impl(void) = 0;
-    virtual void beginTransaction_impl(void) = 0;
-    virtual void endTransaction_impl(void) = 0;
-
-    static void tmpBeginTransaction(void* lgfx)
+    static void tmpBeginTransaction(LGFXBase* lgfx)
     {
-      auto me = (LGFXBase*)lgfx;
-      if (me->_transaction_count) { me->beginTransaction(); }
+      if (lgfx->getStartCount()) { lgfx->beginTransaction(); }
     }
 
-    static void tmpEndTransaction(void* lgfx)
+    static void tmpEndTransaction(LGFXBase* lgfx)
     {
-      auto me = (LGFXBase*)lgfx;
-      if (me->_transaction_count)
+      if (lgfx->getStartCount())
       {
-        auto ad = me->_auto_display;
-        me->_auto_display = false;
-        me->endTransaction();
-        me->_auto_display = ad;
+        lgfx->endTransaction();
       }
     }
 
-    void prepareTmpTransaction(DataWrapper* data)
-    {
-      if (data->need_transaction && isSPIShared())
-      {
-        data->parent = this;
-        data->fp_pre_read  = tmpEndTransaction;
-        data->fp_post_read = tmpBeginTransaction;
-      }
-    }
-    __attribute__ ((always_inline)) inline void startWrite(bool transaction)
-    {
-      if (1 == ++_transaction_count && transaction) { beginTransaction(); }
-    }
   };
 
 //----------------------------------------------------------------------------
 
+  /// LovyanGFXクラス。ファイルシステム等、利用環境側のinclude順に依存する機能はLGFX_FILESYSTEM_Supportから継承する。
   class LovyanGFX : public
   #ifdef LGFX_FILESYSTEM_SUPPORT_HPP_
       LGFX_FILESYSTEM_Support<
@@ -1093,13 +1044,314 @@ namespace lgfx
     using LGFXBase::_get_text_filled_x;
     using LGFXBase::_set_text_filled_x;
     using LGFXBase::_get_font_metrics;
-    using LGFXBase::writeRawColor;
+  };
+
+//----------------------------------------------------------------------------
+
+  class Panel_Device;
+
+  class LGFX_Device : public LovyanGFX
+  {
+  public:
+    LGFX_Device(void);
+
+    void init(void)               { init_impl(true , true); };
+    void begin(void)              { init_impl(true , true); };
+    void init_without_reset(void) { init_impl(false, false); };
+
+    void setEpdMode(epd_mode_t epd_mode) { _panel->setEpdMode(epd_mode); }
+    epd_mode_t getEpdMode(void) const { return _panel->getEpdMode(); }
+    inline void invertDisplay(bool i) { _panel->setInvert(i); }
+    inline bool getInvert(void) const { return _panel->getInvert(); }
+
+    inline void sleep(void) { _panel->setSleep(true); }
+    inline void wakeup(void) { _panel->setSleep(false); }
+    inline void powerSave(bool flg) { _panel->setPowerSave(flg); }
+    inline void powerSaveOn(void) { _panel->setPowerSave(true); }
+    inline void powerSaveOff(void) { _panel->setPowerSave(false); }
+
+    inline Panel_Device* panel(void) const { return reinterpret_cast<Panel_Device*>(_panel); }
+    inline Panel_Device* getPanel(void) const { return reinterpret_cast<Panel_Device*>(_panel); }
+    inline void panel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
+    inline void setPanel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
+
+    inline ILight* light(void) const { return _light; }
+    inline void light(ILight* light) { _light = light; }
+    inline void setLight(ILight* light) { _light = light; }
+
+    inline ITouch* touch(void) const { return _touch; }
+    inline void touch(ITouch* touch) { _touch = touch; }
+    inline void setTouch(ITouch* touch) { _touch = touch; }
+
+
+    inline void writeCommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // AdafruitGFX compatible
+    inline void writecommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // TFT_eSPI compatible
+    inline void writeCommand16(std::uint16_t cmd) { _panel->writeCommand(__builtin_bswap16(cmd), 2); }
+    inline void spiWrite(   std::uint8_t  data) { _panel->writeData(                  data , 1); } // AdafruitGFX compatible
+    inline void writedata(  std::uint8_t  data) { _panel->writeData(                  data , 1); } // TFT_eSPI compatible
+    inline void writeData(  std::uint8_t  data) { _panel->writeData(                  data , 1); }
+    inline void writeData16(std::uint16_t data) { _panel->writeData(__builtin_bswap16(data), 2); }
+    inline void writeData32(std::uint32_t data) { _panel->writeData(__builtin_bswap32(data), 4); }
+    inline std::uint8_t  readData8( std::uint8_t index=0) { return                   _panel->readData(index, 1) ; }
+    inline std::uint16_t readData16(std::uint8_t index=0) { return __builtin_bswap16(_panel->readData(index, 2)); }
+    inline std::uint32_t readData32(std::uint8_t index=0) { return __builtin_bswap32(_panel->readData(index, 4)); }
+
+    inline void setBrightness(std::uint8_t brightness) { if (_light) _light->setBrightness(brightness); }
+    inline std::uint8_t getBrightness(void) const { return _light ? _light->getBrightness() : 0; }
+
+    std::uint_fast8_t getTouchRaw(touch_point_t *tp, std::uint_fast8_t number = 0)
+    {
+      if (_touch == nullptr) return 0;
+
+      bool need_transaction = (_touch->config().bus_shared && getStartCount());
+      if (need_transaction) { endTransaction(); }
+      auto res = _touch->getTouchRaw(tp, number);
+      if (need_transaction) { beginTransaction(); }
+      return res;
+    }
+
+    std::uint_fast8_t getTouch(touch_point_t *tp, std::uint_fast8_t number = 0)
+    {
+      if (_touch == nullptr) return 0;
+
+      bool need_transaction = (_touch->config().bus_shared && getStartCount());
+      if (need_transaction) { endTransaction(); }
+      auto res = _touch->getTouch(tp, number);
+      if (need_transaction) { beginTransaction(); }
+
+      std::uint_fast8_t r = getRotation();
+      if (r & 1) {
+        std::swap(tp->x, tp->y);
+      }
+      if (r & 2) tp->x = (width()-1) - tp->x;
+      if ((0 == ((r + 1) & 2)) != (0 == (r & 4))) tp->y = (height()-1) - tp->y;
+
+      return res;
+    }
+
+    touch_point_t getTouch(std::uint_fast8_t number = 0)
+    {
+      touch_point_t res;
+      getTouch(&res, number);
+      return res;
+    }
+
+    std::uint_fast8_t getTouchRaw(std::int32_t *x = nullptr, std::int32_t *y = nullptr, std::uint_fast8_t number = 0)
+    {
+      touch_point_t tp;
+      auto res = getTouchRaw(&tp, number);
+      if (x) *x = tp.x;
+      if (y) *y = tp.y;
+      return res;
+    }
+
+    template <typename T>
+    std::uint_fast8_t getTouch(T *x, T *y, std::uint_fast8_t number = 0)
+    {
+      touch_point_t tp;
+      auto res = getTouch(&tp, number);
+      if (x) *x = tp.x;
+      if (y) *y = tp.y;
+      return res;
+    }
+
+    void convertRawXY(std::uint16_t *x, std::uint16_t *y)
+    {
+      std::int32_t tx = *x, ty = *y;
+      convertRawXY(&tx, &ty);
+      *x = tx;
+      *y = ty;
+    }
+
+    void convertRawXY(std::int32_t *x, std::int32_t *y)
+    {
+      std::uint_fast8_t r = getRotation();
+      if (r & 1) {
+        std::swap(x, y);
+      }
+      if (r & 2) *x = (width()-1) - *x;
+      if ((0 == ((r + 1) & 2)) != (0 == (r & 4))) *y = (height()-1) - *y;
+    }
+
+    // This requires a uint16_t array with 8 elements. ( or nullptr )
+    template <typename T>
+    void calibrateTouch(uint16_t *parameters, const T& color_fg, const T& color_bg, uint8_t size = 10)
+    {
+      calibrate_touch(parameters, _write_conv.convert(color_fg), _write_conv.convert(color_bg), size);
+    }
+
+    void updateTouchCalibrate(void)
+    {
+      auto cfg = _touch->config();
+      std::uint16_t parameters[8] =
+        { cfg.x_min, cfg.y_min
+        , cfg.x_min, cfg.y_max
+        , cfg.x_max, cfg.y_min
+        , cfg.x_max, cfg.y_max };
+      setTouchCalibrate(parameters);
+    }
+
+    // This requires a uint16_t array with 8 elements.
+    void setTouchCalibrate(std::uint16_t *parameters)
+    {
+      if (_touch == nullptr) return;
+      //bool r = getRotation() & 1;
+      std::int32_t w = width();
+      std::int32_t h = height();
+      if (getRotation() & 1) std::swap(w, h);
+      _touch->setCalibrate(parameters, w, h);
+    }
+
+  protected:
+    ILight* _light = nullptr;
+    ITouch* _touch = nullptr;
+
+    virtual void init_impl(bool use_reset, bool use_clear);
+
+    void draw_calibrate_point(std::int32_t x, std::int32_t y, std::int32_t r, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor)
+    {
+      setRawColor(bg_rawcolor);
+      fillRect(x - r, y - r, r * 2 + 1, r * 2 + 1);
+      if (fg_rawcolor == bg_rawcolor) return;
+      startWrite();
+      setRawColor(fg_rawcolor);
+      fillRect(x - 1, y - r, 3, r * 2 + 1);
+      fillRect(x - r, y - 1, r * 2 + 1, 3);
+      for (std::int32_t i = - r + 1; i < r; ++i) {
+        drawFastHLine(x + i - 1, y + i, 3);
+        drawFastHLine(x - i - 1, y + i, 3);
+      }
+      drawFastHLine(x + r - 1, y + r, 2);
+      drawFastHLine(x - r    , y + r, 2);
+      drawFastHLine(x - r    , y - r, 2);
+      drawFastHLine(x + r - 1, y - r, 2);
+      endWrite();
+    }
+
+    void calibrate_touch(std::uint16_t *parameters, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor, std::uint8_t size)
+    {
+      if (nullptr == _touch) return;
+      auto rot = getRotation();
+      setRotation(0);
+
+      std::uint16_t orig[8];
+      for (int i = 0; i < 4; ++i) {
+        std::int32_t px = (width() -  1) * ((i>>1) & 1);
+        std::int32_t py = (height() - 1) * ( i     & 1);
+        draw_calibrate_point( px, py, size, fg_rawcolor, bg_rawcolor);
+        delay(500);
+        std::int32_t x_touch = 0, y_touch = 0;
+        static constexpr int _RAWERR = 20;
+        std::int32_t x_tmp, y_tmp, x_tmp2, y_tmp2;
+        for (int j = 0; j < 8; ++j) {
+          do {
+            do { delay(1); } while (!getTouchRaw(&x_tmp,&y_tmp));
+            delay(2); // Small delay to the next sample
+          } while (!getTouchRaw(&x_tmp2,&y_tmp2)
+                 || (abs(x_tmp - x_tmp2) > _RAWERR)
+                 || (abs(y_tmp - y_tmp2) > _RAWERR));
+
+          x_touch += x_tmp;
+          x_touch += x_tmp2;
+          y_touch += y_tmp;
+          y_touch += y_tmp2;
+        }
+        orig[i*2  ] = x_touch >> 4;
+        orig[i*2+1] = y_touch >> 4;
+        draw_calibrate_point( px, py, size, bg_rawcolor, bg_rawcolor);
+        while (getTouchRaw());
+      }
+      if (nullptr != parameters) {
+        memcpy(parameters, orig, sizeof(std::uint16_t) * 8);
+      }
+      _touch->setCalibrate(orig, width(), height());
+      //set_touch_calibrate(orig);
+      setRotation(rot);
+    }
+/*
+    void set_touch_calibrate(std::uint16_t *parameters)
+    {
+      std::uint32_t vect[6] = {0,0,0,0,0,0};
+      float mat[3][3] = {{0,0,0},{0,0,0},{0,0,0}};
+
+      bool r = getRotation() & 1;
+      std::int32_t w = r ? _height : _width;
+      std::int32_t h = r ? _width : _height;
+      --w;
+      --h;
+      float a;
+      for ( int i = 0; i < 4; ++i ) {
+        std::int32_t tx = w * ((i>>1) & 1);
+        std::int32_t ty = h * ( i     & 1);
+        std::int32_t px = parameters[i*2  ];
+        std::int32_t py = parameters[i*2+1];
+        a = px * px;
+        mat[0][0] += a;
+        a = px * py;
+        mat[0][1] += a;
+        mat[1][0] += a;
+        a = px;
+        mat[0][2] += a;
+        mat[2][0] += a;
+        a = py * py;
+        mat[1][1] += a;
+        a = py;
+        mat[1][2] += a;
+        mat[2][1] += a;
+        mat[2][2] += 1;
+
+        vect[0] += px * tx;
+        vect[1] += py * tx;
+        vect[2] +=      tx;
+        vect[3] += px * ty;
+        vect[4] += py * ty;
+        vect[5] +=      ty;
+      }
+
+      {
+        float det = 1;
+        for ( int k = 0; k < 3; ++k )
+        {
+          float t = mat[k][k];
+          det *= t;
+          for ( int i = 0; i < 3; ++i ) mat[k][i] /= t;
+
+          mat[k][k] = 1 / t;
+          for ( int j = 0; j < 3; ++j )
+          {
+            if ( j == k ) continue;
+
+            float u = mat[j][k];
+
+            for ( int i = 0; i < 3; ++i )
+            {
+              if ( i != k ) mat[j][i] -= mat[k][i] * u;
+              else mat[j][i] = -u / t;
+            }
+          }
+        }
+      }
+
+      float result[6];
+      float v0 = vect[0];
+      float v1 = vect[1];
+      float v2 = vect[2];
+      result[0] = mat[0][0] * v0 + mat[0][1] * v1 + mat[0][2] * v2;
+      result[1] = mat[1][0] * v0 + mat[1][1] * v1 + mat[1][2] * v2;
+      result[2] = mat[2][0] * v0 + mat[2][1] * v1 + mat[2][2] * v2;
+      float v3 = vect[3];
+      float v4 = vect[4];
+      float v5 = vect[5];
+      result[3] = mat[0][0] * v3 + mat[0][1] * v4 + mat[0][2] * v5;
+      result[4] = mat[1][0] * v3 + mat[1][1] * v4 + mat[1][2] * v5;
+      result[5] = mat[2][0] * v3 + mat[2][1] * v4 + mat[2][2] * v5;
+      _touch->setCalibrateAffine(result);
+    }
+//*/
+//----------------------------------------------------------------------------
+
   };
 
 //----------------------------------------------------------------------------
  }
 }
-
-using LovyanGFX = lgfx::LovyanGFX;
-
-#endif

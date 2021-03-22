@@ -21,41 +21,41 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #pragma once
 
-#include "gitTagVersion.h"
+#include "v0/gitTagVersion.h"
 
-#include "lgfx_common.hpp"         // common include (always include)
+#include "v0/lgfx_common.hpp"         // common include (always include)
 
-#include "lgfx_filesystem_support.hpp" // filesystem extention (optional)
+#include "v0/lgfx_filesystem_support.hpp" // filesystem extention (optional)
 
-#include "LGFXBase.hpp"           // base class (always include)
+#include "v0/LGFXBase.hpp"           // base class (always include)
 
-#include "LGFX_Sprite.hpp"         // sprite class (optional)
+#include "v0/LGFX_Sprite.hpp"         // sprite class (optional)
 
-#include "panel/PanelCommon.hpp"
-#include "touch/TouchCommon.hpp"
+#include "v0/panel/PanelCommon.hpp"
+#include "v0/touch/TouchCommon.hpp"
 
-#include "panel/Panel_HX8357.hpp"
-#include "panel/Panel_ILI9163.hpp"
-#include "panel/Panel_ILI9341.hpp"   // and ILI9342 / M5Stack / ODROID-GO / ESP-WROVER-KIT4.1 / WioTerminal
-#include "panel/Panel_ILI9481.hpp"
-#include "panel/Panel_ILI9486.hpp"
-#include "panel/Panel_ILI9488.hpp"
-#include "panel/Panel_SSD1351.hpp"
-#include "panel/Panel_ST7735.hpp"    // M5StickC / LilyGO TTGO T-Wristband
-#include "panel/Panel_ST7789.hpp"    // M5StickCPlus / LilyGO TTGO T-Watch / ESP-WROVER-KIT4.1
-#include "panel/Panel_ST7796.hpp"
+#include "v0/panel/Panel_HX8357.hpp"
+#include "v0/panel/Panel_ILI9163.hpp"
+#include "v0/panel/Panel_ILI9341.hpp"   // and ILI9342 / M5Stack / ODROID-GO / ESP-WROVER-KIT4.1 / WioTerminal
+#include "v0/panel/Panel_ILI9481.hpp"
+#include "v0/panel/Panel_ILI9486.hpp"
+#include "v0/panel/Panel_ILI9488.hpp"
+#include "v0/panel/Panel_SSD1351.hpp"
+#include "v0/panel/Panel_ST7735.hpp"    // M5StickC / LilyGO TTGO T-Wristband
+#include "v0/panel/Panel_ST7789.hpp"    // M5StickCPlus / LilyGO TTGO T-Watch / ESP-WROVER-KIT4.1
+#include "v0/panel/Panel_ST7796.hpp"
 
-#include "touch/Touch_XPT2046.hpp"
-#include "touch/Touch_STMPE610.hpp"
-#include "touch/Touch_FT5x06.hpp"
-#include "touch/Touch_GT911.hpp"
+#include "v0/touch/Touch_XPT2046.hpp"
+#include "v0/touch/Touch_STMPE610.hpp"
+#include "v0/touch/Touch_FT5x06.hpp"
+#include "v0/touch/Touch_GT911.hpp"
 
 #if defined (ESP32) || defined (CONFIG_IDF_TARGET_ESP32) || defined (ESP_PLATFORM)
-  #include "platforms/LGFX_SPI_ESP32.hpp"
-  #include "platforms/LGFX_PARALLEL_ESP32.hpp"
+  #include "v0/platforms/LGFX_SPI_ESP32.hpp"
+  #include "v0/platforms/LGFX_PARALLEL_ESP32.hpp"
 
 #elif defined (__SAMD51__)
-  #include "platforms/LGFX_SPI_SAMD51.hpp"
+  #include "v0/platforms/LGFX_SPI_SAMD51.hpp"
 
 #endif
 
@@ -78,6 +78,8 @@ Contributors:
   #define LGFX_M5STACK_CORE2
  #elif defined( ARDUINO_M5Stick_C ) // M5Stick C / CPlus
   #define LGFX_M5STICK_C
+ #elif defined( ARDUINO_M5Stick_C_Plus )
+  #define LGFX_M5STICK_C
  #elif defined( ARDUINO_M5Stack_CoreInk ) // M5Stack CoreInk
   #define LGFX_M5STACK_COREINK
  #elif defined( ARDUINO_M5STACK_Paper ) // M5Paper
@@ -97,21 +99,19 @@ Contributors:
  #endif
 
  #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STACK_COREINK )
-  #include "panel/Panel_GDEW0154M09.hpp"
+  #include "v0/panel/Panel_GDEW0154M09.hpp"
  #endif
  #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5PAPER )
-  #include "panel/Panel_IT8951.hpp"
+  #include "v0/panel/Panel_IT8951.hpp"
  #endif
 
- #include "config/LGFX_Config_AutoDetectESP32.hpp"
+ #include "v0/config/LGFX_Config_AutoDetectESP32.hpp"
 
 #elif defined (__SAMD51__)
 
  #if defined( LGFX_WIO_TERMINAL ) || defined (ARDUINO_WIO_TERMINAL) || defined(WIO_TERMINAL)
-  #include "config/LGFX_Config_WioTerminal.hpp"
+  #include "v0/config/LGFX_Config_WioTerminal.hpp"
 
  #endif
 
 #endif
-
-
