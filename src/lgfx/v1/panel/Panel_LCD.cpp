@@ -67,7 +67,7 @@ namespace lgfx
       _bus->writeData(0, 8);
     }
 
-    if (_cfg.pin_cs < 0)
+    if (_cfg.pin_cs < 0 && _bus->busType() != bus_type_t::bus_i2c)
     {
       write_command(_cmd_nop); // NOP command
     }
@@ -355,7 +355,7 @@ namespace lgfx
 
   void Panel_LCD::write_bytes(const std::uint8_t* data, std::uint32_t len, bool use_dma)
   {
-    _bus->writeBytes(data, len, use_dma);
+    _bus->writeBytes(data, len, true, use_dma);
     if (_cfg.dlen_16bit && (_write_bits & 15) && (len & 1))
     {
       _align_data = !_align_data;

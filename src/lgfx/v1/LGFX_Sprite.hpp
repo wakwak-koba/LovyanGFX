@@ -64,23 +64,11 @@ namespace lgfx
 
     SpriteBuffer _img;
 
-    std::uint32_t _index;
     std::uint_fast16_t _xpos;
     std::uint_fast16_t _ypos;
     std::uint_fast16_t _panel_width;   // rotationしていない状態の幅
     std::uint_fast16_t _panel_height;  // rotationしていない状態の高さ
     std::uint_fast16_t _bitwidth;
-
-    inline std::uint32_t ptr_advance(std::uint32_t length = 1)
-    {
-      if ((_xpos += length) <= _xe) return (_index += length);
-      _xpos = _xs;
-      if (++_ypos > _ye)
-      {
-        _ypos = _ys;
-      }
-      return (_index = _xpos + _ypos * _bitwidth);
-    }
   };
 
   class LGFX_Sprite : public LovyanGFX

@@ -29,16 +29,8 @@ namespace lgfx
   {
     virtual ~ILight(void) = default;
 
-    virtual void init(void) = 0;
+    virtual void init(std::uint8_t brightness) = 0;
     virtual void setBrightness(std::uint8_t brightness) = 0;
-    void setSleep(bool flg) { _sleep = flg; setBrightness(_brightness); }
-
-    std::uint8_t getBrightness(void) const { return _brightness; }
-
-  protected:
-
-    std::uint8_t _brightness = 127;
-    bool _sleep = false;
   };
 /*
   struct Light_NULL : public ILight

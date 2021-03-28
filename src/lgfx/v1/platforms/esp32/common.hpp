@@ -230,6 +230,7 @@ public:
   namespace i2c
   {
     void init(int i2c_port, int pin_sda, int pin_scl, int freq);
+    void setClock(int i2c_port, int freq);
     bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::uint8_t len);
     bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::uint8_t readlen);
     bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::uint8_t len);

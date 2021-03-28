@@ -276,7 +276,7 @@ namespace lgfx
         if (limit <= 512) limit <<= 1;
         auto dmabuf = _flip_buffer.getBuffer(len * bytes);
         param->fp_copy(dmabuf, 0, len, param);
-        writeBytes(dmabuf, len * bytes, true);
+        writeBytes(dmabuf, len * bytes, true, true);
       } while (length -= len);
       return;
     }
@@ -323,14 +323,14 @@ namespace lgfx
     }
   }
 
-  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma)
+  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
     if (length <= 64)
     {
       auto spi_w0_reg = _spi_w0_reg;
       auto aligned_len = (length + 3) & (~3);
       length <<= 3;
-      dc_control(true);
+      dc_control(dc);
       set_write_len(length);
       memcpy((void*)spi_w0_reg, data, aligned_len);
       exec_spi();
@@ -348,7 +348,7 @@ namespace lgfx
       }
       if (use_dma)
       {
-        dc_control(true);
+        dc_control(dc);
         set_write_len(length << 3);
         _setup_dma_desc_links(data, length);
         *_spi_dma_out_link_reg = SPI_OUTLINK_START | ((int)(&_dmadesc[0]) & 0xFFFFF);
@@ -364,7 +364,7 @@ namespace lgfx
     auto spi_w0_reg = _spi_w0_reg;
 
     std::uint32_t user_reg = _user_reg;
-    dc_control(true);
+    dc_control(dc);
     set_write_len(len << 3);
 
     memcpy((void*)&spi_w0_reg[highpart], data, (len + 3) & (~3));
@@ -407,7 +407,7 @@ namespace lgfx
   {
     if (!_cfg.dma_channel)
     {
-      writeBytes(data, length, true);
+      writeBytes(data, length, true, true);
       return;
     }
 

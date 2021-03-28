@@ -28,12 +28,12 @@ namespace lgfx
 
   static constexpr std::uint8_t Bayer[16] = { 8, 136, 40, 168, 200, 72, 232, 104, 56, 184, 24, 152, 248, 120, 216, 88 };
 
-  Panel_SSD1306::~Panel_SSD1306(void)
+  Panel_1bitOLED::~Panel_1bitOLED(void)
   {
     if (_buf) heap_free(_buf);
   }
 
-  color_depth_t Panel_SSD1306::setColorDepth(color_depth_t depth)
+  color_depth_t Panel_1bitOLED::setColorDepth(color_depth_t depth)
   {
     _write_bits = 16;
     _read_bits = 16;
@@ -42,7 +42,40 @@ namespace lgfx
     return color_depth_t::rgb565_2Byte;
   }
 
-  void Panel_SSD1306::init(bool use_reset)
+  void Panel_1bitOLED::setRotation(std::uint_fast8_t r)
+  {
+    r &= 7;
+    _rotation = r;
+    _internal_rotation = ((r + _cfg.offset_rotation) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
+
+    _width  = _cfg.panel_width;
+    _height = _cfg.panel_height;
+    if (_internal_rotation & 1) std::swap(_width, _height);
+  }
+
+  void Panel_1bitOLED::beginTransaction(void)
+  {
+    _bus->beginTransaction();
+    cs_control(false);
+  }
+
+  void Panel_1bitOLED::endTransaction(void)
+  {
+    _bus->endTransaction();
+    cs_control(true);
+  }
+
+  void Panel_1bitOLED::waitDisplay(void)
+  {
+    _bus->wait();
+  }
+
+  bool Panel_1bitOLED::displayBusy(void)
+  {
+    return _bus->busy();
+  }
+
+  void Panel_1bitOLED::init(bool use_reset)
   {
     Panel_Device::init(use_reset);
 
@@ -53,35 +86,15 @@ namespace lgfx
 
     startWrite(true);
 
+    _bus->writeBytes(_buf, len, true, true);
+
     for (std::uint8_t i = 0; auto cmds = getInitCommands(i); i++)
     {
-      command_list(cmds);
+      std::size_t idx = 0;
+      while (cmds[idx] != 0xFF && cmds[idx + 1] != 0xFF) ++idx;
+      if (idx)
+      _bus->writeBytes(cmds, idx, false, false);
     }
-/*
-    if ( false ) // external_vcc
-    {
-      writeCommand(CMD_CHARGEPUMP, 1);
-      writeCommand(0x10, 1);
-
-      writeCommand(CMD_SETCONTRAST, 1);
-      writeCommand(0x9F, 1);
-
-      writeCommand(CMD_SETPRECHG, 1);
-      writeCommand(0x22, 1);
-    }
-    else
-//*/
-    {
-      writeCommand(CMD_CHARGEPUMP, 1);
-      writeCommand(0x14, 1);
-
-      writeCommand(CMD_SETCONTRAST, 1);
-      writeCommand(0xCF, 1);
-
-      writeCommand(CMD_SETPRECHG, 1);
-      writeCommand(0xF1, 1);
-    }
-
 
     setInvert(_invert);
 
@@ -95,59 +108,7 @@ namespace lgfx
     endWrite();
   }
 
-  void Panel_SSD1306::beginTransaction(void)
-  {
-    _bus->beginTransaction();
-    cs_control(false);
-  }
-
-  void Panel_SSD1306::endTransaction(void)
-  {
-    _bus->endTransaction();
-    cs_control(true);
-  }
-
-  void Panel_SSD1306::waitDisplay(void)
-  {
-    _bus->wait();
-  }
-
-  bool Panel_SSD1306::displayBusy(void)
-  {
-    return _bus->busy();
-  }
-
-  void Panel_SSD1306::display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h)
-  {
-    if (0 < w && 0 < h)
-    {
-      _range_new.left   = std::min<std::int16_t>(_range_new.left  , x        );
-      _range_new.right  = std::max<std::int16_t>(_range_new.right , x + w - 1);
-      _range_new.top    = std::min<std::int16_t>(_range_new.top   , y        );
-      _range_new.bottom = std::max<std::int16_t>(_range_new.bottom, y + h - 1);
-    }
-    if (_range_new.empty()) { return; }
-
-    std::uint_fast8_t xs = _range_new.left;
-    std::uint_fast8_t xe = _range_new.right;
-    _bus->writeCommand(CMD_COLUMNADDR| xs << 8 | xe << 16, 24);
-
-    std::uint_fast8_t ys = _range_new.top    >> 3;
-    std::uint_fast8_t ye = _range_new.bottom >> 3;
-    _bus->writeCommand(CMD_PAGEADDR  | ys << 8 | ye << 16, 24);
-    do
-    {
-      auto buf = &_buf[xs + ys * _cfg.panel_width];
-      _bus->writeBytes(buf, xe - xs + 1);
-    } while (++ys <= ye);
-
-    _range_new.top    = INT16_MAX;
-    _range_new.left   = INT16_MAX;
-    _range_new.right  = 0;
-    _range_new.bottom = 0;
-  }
-
-  void Panel_SSD1306::setInvert(bool invert)
+  void Panel_1bitOLED::setInvert(bool invert)
   {
     startWrite();
     _invert = invert;
@@ -155,25 +116,14 @@ namespace lgfx
     endWrite();
   }
 
-  void Panel_SSD1306::setSleep(bool flg)
+  void Panel_1bitOLED::setSleep(bool flg)
   {
     startWrite();
     _bus->writeCommand(flg ? CMD_DISP_OFF : CMD_DISP_ON, 8);
     endWrite();
   }
 
-  void Panel_SSD1306::setRotation(std::uint_fast8_t r)
-  {
-    r &= 7;
-    _rotation = r;
-    _internal_rotation = ((r + _cfg.offset_rotation) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
-
-    _width  = _cfg.panel_width;
-    _height = _cfg.panel_height;
-    if (_internal_rotation & 1) std::swap(_width, _height);
-  }
-
-  void Panel_SSD1306::setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye)
+  void Panel_1bitOLED::setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye)
   {
     _xpos = xs;
     _ypos = ys;
@@ -183,7 +133,7 @@ namespace lgfx
     _ye = ye;
   }
 
-  void Panel_SSD1306::drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor)
+  void Panel_1bitOLED::drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor)
   {
     bool need_transaction = !getStartCount();
     if (need_transaction) startWrite();
@@ -191,7 +141,7 @@ namespace lgfx
     if (need_transaction) endWrite();
   }
 
-  void Panel_SSD1306::writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor)
+  void Panel_1bitOLED::writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor)
   {
     std::uint32_t xs = x, xe = x + w - 1;
     std::uint32_t ys = y, ye = y + h - 1;
@@ -222,7 +172,7 @@ namespace lgfx
     } while (++y <= ye);
   }
 
-  void Panel_SSD1306::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool use_dma)
+  void Panel_1bitOLED::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool use_dma)
   {
     std::uint32_t xs = x, xe = x + w - 1;
     std::uint32_t ys = y, ye = y + h - 1;
@@ -251,7 +201,7 @@ namespace lgfx
     } while (++y < h);
   }
 
-  void Panel_SSD1306::writeBlock(std::uint32_t rawcolor, std::uint32_t length)
+  void Panel_1bitOLED::writeBlock(std::uint32_t rawcolor, std::uint32_t length)
   {
     std::uint32_t xs = _xs;
     std::uint32_t xe = _xe;
@@ -282,7 +232,7 @@ namespace lgfx
     _ypos = ypos;
   }
 
-  void Panel_SSD1306::writePixels(pixelcopy_t* param, std::uint32_t length)
+  void Panel_1bitOLED::writePixels(pixelcopy_t* param, std::uint32_t length)
   {
     {
       std::uint32_t xs = _xs;
@@ -322,7 +272,7 @@ namespace lgfx
     _ypos = ypos;
   }
 
-  void Panel_SSD1306::readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param)
+  void Panel_1bitOLED::readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param)
   {
     swap565_t readbuf[w];
     param->src_data = readbuf;
@@ -340,7 +290,7 @@ namespace lgfx
     } while (++y < h);
   }
 
-  void Panel_SSD1306::_draw_pixel(std::int32_t x, std::int32_t y, std::uint32_t value)
+  void Panel_1bitOLED::_draw_pixel(std::int32_t x, std::int32_t y, std::uint32_t value)
   {
     if (_internal_rotation & 1) { std::swap(x, y); }
     switch (_internal_rotation) {
@@ -358,7 +308,7 @@ namespace lgfx
     else     _buf[idx] &= ~mask;
   }
 
-  bool Panel_SSD1306::_read_pixel(std::int32_t x, std::int32_t y)
+  bool Panel_1bitOLED::_read_pixel(std::int32_t x, std::int32_t y)
   {
     if (_internal_rotation & 1) { std::swap(x, y); }
     switch (_internal_rotation) {
@@ -373,30 +323,163 @@ namespace lgfx
     return _buf[idx] & (1 << (y&7));
   }
 
-  void Panel_SSD1306::_update_transferred_rect(std::uint32_t &xs, std::uint32_t &ys, std::uint32_t &xe, std::uint32_t &ye)
+  void Panel_1bitOLED::_update_transferred_rect(std::uint32_t &xs, std::uint32_t &ys, std::uint32_t &xe, std::uint32_t &ye)
   {
     auto r = _internal_rotation;
     if (r & 1) { std::swap(xs, ys); std::swap(xe, ye); }
-    switch (r) {
-    default: break;
-    case 1:  case 2:  case 6:  case 7:
+    if ((1<<r) & 0b11000110) // case 1:2:6:7:
+    {
       std::swap(xs, xe);
       xs = _cfg.panel_width - 1 - xs;
       xe = _cfg.panel_width - 1 - xe;
-      break;
     }
-    switch (r) {
-    default: break;
-    case 2: case 3: case 4: case 7:
+    if ((1<<r) & 0b10011100) // case 2:3:4:7:
+    {
       std::swap(ys, ye);
       ys = _cfg.panel_height - 1 - ys;
       ye = _cfg.panel_height - 1 - ye;
-      break;
     }
     _range_new.left   = std::min<std::int32_t>(xs, _range_new.left);
     _range_new.right  = std::max<std::int32_t>(xe, _range_new.right);
     _range_new.top    = std::min<std::int32_t>(ys, _range_new.top);
     _range_new.bottom = std::max<std::int32_t>(ye, _range_new.bottom);
+  }
+
+//----------------------------------------------------------------------------
+
+  void Panel_SSD1306::setBrightness(std::uint8_t brightness)
+  {
+    startWrite();
+    _bus->writeCommand(CMD_SETPRECHG | ((brightness+15)/17)*0x11 << 8, 16);
+    _bus->writeCommand(CMD_SETVCOMDET | (brightness>>1) << 8, 16);
+    _bus->writeCommand(CMD_SETCONTRAST | brightness << 8, 16);
+    endWrite();
+  }
+
+  void Panel_SSD1306::display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h)
+  {
+    if (0 < w && 0 < h)
+    {
+      _range_new.left   = std::min<std::int16_t>(_range_new.left  , x        );
+      _range_new.right  = std::max<std::int16_t>(_range_new.right , x + w - 1);
+      _range_new.top    = std::min<std::int16_t>(_range_new.top   , y        );
+      _range_new.bottom = std::max<std::int16_t>(_range_new.bottom, y + h - 1);
+    }
+    if (_range_new.empty()) { return; }
+
+    std::uint_fast8_t xs = _range_new.left;
+    std::uint_fast8_t xe = _range_new.right;
+    _bus->writeCommand(CMD_COLUMNADDR| (xs + _cfg.offset_x) << 8 | (xe + _cfg.offset_x) << 16, 24);
+
+    std::uint_fast8_t ys = _range_new.top    >> 3;
+    std::uint_fast8_t ye = _range_new.bottom >> 3;
+    _bus->writeCommand(CMD_PAGEADDR | (ys + (_cfg.offset_y >> 3)) << 8 | (ye + (_cfg.offset_y >> 3)) << 16, 24);
+    do
+    {
+      auto buf = &_buf[xs + ys * _cfg.panel_width];
+      _bus->writeBytes(buf, xe - xs + 1, true, true);
+    } while (++ys <= ye);
+
+    _range_new.top    = INT16_MAX;
+    _range_new.left   = INT16_MAX;
+    _range_new.right  = 0;
+    _range_new.bottom = 0;
+  }
+
+//----------------------------------------------------------------------------
+
+  void Panel_SH110x::init(bool use_reset)
+  {
+    Panel_Device::init(use_reset);
+
+    int len = ((_cfg.panel_height + 7) >> 3) * _cfg.panel_width;
+    if (_buf) heap_free(_buf);
+    _buf = static_cast<std::uint8_t*>(heap_alloc_dma(len));
+    memset(_buf, 0, len);
+    startWrite(true);
+
+    for (std::uint8_t i = 0; auto cmds = getInitCommands(i); i++)
+    {
+      std::size_t idx = 0;
+      while (cmds[idx] != 0xFF || cmds[idx + 1] != 0xFF) ++idx;
+      if (idx) _bus->writeBytes(cmds, idx, false, false);
+    }
+    _bus->writeCommand(CMD_SETMULTIPLEX | (((_cfg.panel_width-1) & 0x7F) << 8), 16);
+    _bus->writeCommand(CMD_SETDISPLAYOFFSET | ((uint8_t)(-_cfg.offset_x) << 8), 16);
+
+
+    _bus->writeCommand(0xDA | 0x12<<8, 16);  // for SH1106 set COM pins
+
+//    _bus->writeCommand(CMD_SETMULTIPLEX | 32 << 8, 16);
+//    _bus->writeCommand(CMD_SETDISPLAYOFFSET | (-48&0x7f) << 8, 16);
+//        CMD_SETDISPSTARTLINE  , count    // 0xDC 0x00
+
+/*
+    _bus->writeCommand(0x00, 8);
+    _bus->writeCommand(0x16, 8);
+    _bus->writeCommand(0xDC, 16);
+    _bus->writeCommand(0xA0, 8);
+    _bus->writeCommand(0xC0, 8);
+*/
+    setInvert(_invert);
+    delay(100);
+
+    setRotation(_rotation);
+
+    _range_new.top = 0;
+    _range_new.left = 0;
+    _range_new.right = _width - 1;
+    _range_new.bottom = _height - 1;
+
+    endWrite();
+  }
+
+  void Panel_SH110x::beginTransaction(void)
+  {
+    _bus->beginTransaction();
+    cs_control(false);
+//    _bus->writeCommand(CMD_READMODIFYWRITE_END, 8);
+  }
+
+  void Panel_SH110x::setBrightness(std::uint8_t brightness)
+  {
+    startWrite();
+    _bus->writeCommand(CMD_SETCONTRAST | brightness << 8, 16);
+    endWrite();
+  }
+
+  void Panel_SH110x::display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h)
+  {
+    if (0 < w && 0 < h)
+    {
+      _range_new.left   = std::min<std::int16_t>(_range_new.left  , x        );
+      _range_new.right  = std::max<std::int16_t>(_range_new.right , x + w - 1);
+      _range_new.top    = std::min<std::int16_t>(_range_new.top   , y        );
+      _range_new.bottom = std::max<std::int16_t>(_range_new.bottom, y + h - 1);
+    }
+    if (_range_new.empty()) { return; }
+
+    std::uint_fast8_t xs = _range_new.left ;
+    std::uint_fast8_t xe = _range_new.right;
+    std::uint_fast8_t ys = _range_new.top    >> 3;
+    std::uint_fast8_t ye = _range_new.bottom >> 3;
+
+    std::uint_fast8_t offset_y = _cfg.offset_y >> 3;
+
+    do
+    {
+      _bus->writeCommand(  CMD_SETPAGEADDR | (ys + offset_y)
+                        | (CMD_SETHIGHCOLUMN | (xs >> 4)) << 8
+                        | (CMD_SETLOWCOLUMN  | (xs & 0x0F)) << 16
+                        , 24);
+      auto buf = &_buf[xs + ys * _cfg.panel_width];
+      _bus->writeBytes(buf, xe - xs + 1, true, true);
+    } while (++ys <= ye);
+
+    _range_new.top    = INT16_MAX;
+    _range_new.left   = INT16_MAX;
+    _range_new.right  = 0;
+    _range_new.bottom = 0;
   }
 
 //----------------------------------------------------------------------------

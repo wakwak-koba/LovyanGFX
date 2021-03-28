@@ -30,7 +30,6 @@ Contributors:
 #include "misc/DataWrapper.hpp"
 #include "lgfx_fonts.hpp"
 #include "Panel.hpp"
-#include "Light.hpp"
 #include "Touch.hpp"
 
 namespace lgfx
@@ -1064,8 +1063,8 @@ namespace lgfx
     inline void invertDisplay(bool i) { _panel->setInvert(i); }
     inline bool getInvert(void) const { return _panel->getInvert(); }
 
-    inline void sleep(void) { _panel->setSleep(true); }
-    inline void wakeup(void) { _panel->setSleep(false); }
+    inline void sleep(void) { _panel->setBrightness(0); _panel->setSleep(true); }
+    inline void wakeup(void) { _panel->setSleep(false); _panel->setBrightness(_brightness); }
     inline void powerSave(bool flg) { _panel->setPowerSave(flg); }
     inline void powerSaveOn(void) { _panel->setPowerSave(true); }
     inline void powerSaveOff(void) { _panel->setPowerSave(false); }
@@ -1074,10 +1073,6 @@ namespace lgfx
     inline Panel_Device* getPanel(void) const { return reinterpret_cast<Panel_Device*>(_panel); }
     inline void panel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
     inline void setPanel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
-
-    inline ILight* light(void) const { return _light; }
-    inline void light(ILight* light) { _light = light; }
-    inline void setLight(ILight* light) { _light = light; }
 
     inline ITouch* touch(void) const { return _touch; }
     inline void touch(ITouch* touch) { _touch = touch; }
@@ -1096,8 +1091,8 @@ namespace lgfx
     inline std::uint16_t readData16(std::uint8_t index=0) { return __builtin_bswap16(_panel->readData(index, 2)); }
     inline std::uint32_t readData32(std::uint8_t index=0) { return __builtin_bswap32(_panel->readData(index, 4)); }
 
-    inline void setBrightness(std::uint8_t brightness) { if (_light) _light->setBrightness(brightness); }
-    inline std::uint8_t getBrightness(void) const { return _light ? _light->getBrightness() : 0; }
+    inline void setBrightness(std::uint8_t brightness) { _brightness = brightness; _panel->setBrightness(brightness); }
+    inline std::uint8_t getBrightness(void) const { return _brightness; }
 
     std::uint_fast8_t getTouchRaw(touch_point_t *tp, std::uint_fast8_t number = 0)
     {
@@ -1203,8 +1198,8 @@ namespace lgfx
     }
 
   protected:
-    ILight* _light = nullptr;
     ITouch* _touch = nullptr;
+    std::uint8_t _brightness = 127;
 
     virtual void init_impl(bool use_reset, bool use_clear);
 

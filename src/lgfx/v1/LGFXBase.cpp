@@ -22,7 +22,7 @@ Contributors:
 #include "../utility/lgfx_qrcode.h"
 #include "../utility/lgfx_tjpgd.h"
 #include "misc/bitmap.hpp"
-//#include "lgfx_TTFfont.hpp"
+#include "lgfx_TTFfont.hpp"
 
 #include <cstdarg>
 #include <cmath>
@@ -1966,7 +1966,8 @@ namespace lgfx
     this->unloadFont();
     bool result = false;
 
-/* // TTF support.
+#ifdef LGFX_TTFFONT_HPP_
+// TTF support.
     std::uint8_t buf[4];
     data->seek(0);
     data->read(buf, 4);
@@ -1977,8 +1978,9 @@ namespace lgfx
       this->_runtime_font.reset(new TTFfont());
     }
     else
-//*/
+#endif
     {
+return false;
       this->_runtime_font.reset(new VLWfont());
     }
 
@@ -2790,11 +2792,11 @@ namespace lgfx
       {
         clear();
       }
+      setBrightness(_brightness);
       endWrite();
     }
 
     if (_touch) _touch->init();
-    if (_light) _light->init();
   }
 /*
   std::uint_fast8_t LGFX_Device::getTouchRaw(touch_point_t *tp, std::uint_fast8_t number)

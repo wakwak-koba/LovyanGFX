@@ -409,19 +409,19 @@ namespace lgfx
     std::uint8_t len = length % limit;
     if (len) {
       fp_copy(buf, 0, len, param);
-      writeBytes(buf, len * bytes, false);
+      writeBytes(buf, len * bytes, true, false);
       if (0 == (length -= len)) return;
     }
     do {
       fp_copy(buf, 0, limit, param);
-      writeBytes(buf, limit * bytes, false);
+      writeBytes(buf, limit * bytes, true, false);
     } while (length -= limit);
   }
 
-  void Bus_Parallel8::writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma)
+  void Bus_Parallel8::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
     auto conf_start = _conf_reg_start;
-    static constexpr std::uint32_t data_wr = 0x01000100;
+    const std::uint32_t data_wr = dc ? 0x01000100 : 0;
 
     if (length & 1) {
       writeData(data[0], 8);

@@ -34,6 +34,13 @@ namespace lgfx
 
     bool need_transaction = false;
 
+    std::uint8_t read8(void)
+    {
+      std::uint8_t result;
+      read(&result, 1);
+      return result;
+    }
+
     std::uint16_t read16(void)
     {
       std::uint16_t result;

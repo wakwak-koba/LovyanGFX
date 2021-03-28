@@ -25,6 +25,7 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
   struct IBus;
+  struct ILight;
 
   class Panel_Device : public IPanel
   {
@@ -33,6 +34,9 @@ namespace lgfx
 
     void bus(IBus* bus);
     inline IBus* bus(void) const { return _bus; }
+
+    inline void setLight(ILight* light) { _light = light; }
+    inline ILight* getLight(void) const { return _light; }
 
     struct config_t
     {
@@ -112,6 +116,8 @@ namespace lgfx
     bool isReadable(void) const override { return _cfg.readable; }
     bool isBusShared(void) const override { return _cfg.bus_shared; }
 
+    void setBrightness(std::uint8_t brightness) override;
+
     void init(bool use_reset) override;
     void initDMA(void) override;
     void waitDMA(void) override;
@@ -129,6 +135,7 @@ namespace lgfx
     config_t _cfg;
 
     IBus* _bus = nullptr;
+    ILight* _light = nullptr;
     bool _align_data = false;
     std::uint8_t _internal_rotation = 0;
 

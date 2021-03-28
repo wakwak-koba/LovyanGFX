@@ -27,6 +27,17 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
+  void Panel_SSD1331::setBrightness(std::uint8_t brightness)
+  {
+    startWrite();
+    _bus->writeCommand(CMD_MASTERCURRENT | (brightness>>4) << 8, 16);
+    _bus->writeCommand(CMD_PRECHARGELEVEL | (brightness>>3) << 8, 16);
+    _bus->writeCommand(0x81 | brightness << 8, 16);
+    _bus->writeCommand(0x82 | brightness << 8, 16);
+    _bus->writeCommand(0x83 | brightness << 8, 16);
+    endWrite();
+  }
+
   void Panel_SSD1331::setInvert(bool invert)
   {
     startWrite();

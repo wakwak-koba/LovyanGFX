@@ -27,6 +27,8 @@ Contributors:
 #include <driver/rtc_io.h>
 #include <driver/periph_ctrl.h>
 #include <soc/rtc.h>
+#include <soc/i2c_reg.h>
+#include <soc/i2c_struct.h>
 
 #if defined ARDUINO
  #include <SPI.h>
@@ -329,6 +331,69 @@ namespace lgfx
 
       i2c_param_config(static_cast<i2c_port_t>(i2c_port), &conf);
       i2c_driver_install(static_cast<i2c_port_t>(i2c_port), I2C_MODE_MASTER, 0, 0, 0);
+#endif
+    }
+
+    void setClock(int i2c_port, int clk_speed)
+    {
+#if 0 //defined (ARDUINO) // Arduino ESP32
+      auto &twowire = (i2c_port) ? Wire1 : Wire;
+      twowire.setClock(clk_speed);
+#else
+      static constexpr std::uint32_t MIN_I2C_CLKS = 16;
+      static constexpr std::uint32_t INTERRUPT_CYCLE_OVERHEAD = 16000;
+
+      rtc_cpu_freq_config_t cpu_freq_conf;
+      rtc_clk_cpu_freq_get_config(&cpu_freq_conf);
+      std::uint32_t apb = 80 * 1000000;
+      if (cpu_freq_conf.freq_mhz < 80) {
+        apb = (cpu_freq_conf.source_freq_mhz * 1000000) / cpu_freq_conf.div;
+      }
+
+      std::uint32_t cycle = (apb / clk_speed) / 2;
+//ESP_LOGI("LGFX", "apb:%d cpu:%d i2c:%d", apb, cpu_freq_conf.freq_mhz * 1000000, clk_speed);
+
+      if (cycle < (MIN_I2C_CLKS/2) ) {
+          cycle = (MIN_I2C_CLKS/2);
+          clk_speed = apb/(cycle*2);
+      } else if ( cycle> 4095) {
+          cycle = 4095;
+          clk_speed = apb/(cycle*2);
+      }
+
+      i2c_dev_t* dev = i2c_port == 0 ? &I2C0 : &I2C1;
+/*
+      uint32_t fifo_delta = (INTERRUPT_CYCLE_OVERHEAD/((cpu_freq_conf.freq_mhz * 1000000 / clk_speed) * 10)) + 1;
+      if (fifo_delta > 24) fifo_delta=24;
+      dev->fifo_conf.rx_fifo_full_thrhd = 32 - fifo_delta;
+      dev->fifo_conf.tx_fifo_empty_thrhd = fifo_delta;
+//*/
+
+//ESP_LOGI("LGFX", "period:low:%d high:%d  new:%d", dev->scl_low_period.period, dev->scl_high_period.period, period);
+
+      dev->timeout.tout = cycle * 20;
+
+/// ESP32 TRM page 286  Table 57: SCL Frequency Configuration
+      std::uint32_t scl_high_period = cycle
+                                    - ( dev->scl_filter_cfg.en
+                                      ? ( dev->scl_filter_cfg.thres > 2
+                                        ? 6 + dev->scl_filter_cfg.thres
+                                        : 8
+                                        )
+                                      : 7);
+      dev->scl_high_period.period = scl_high_period;     //the clock num during SCL is high level
+      dev->scl_low_period.period = cycle - 1;      //the clock num during SCL is low level
+
+      dev->scl_start_hold.time = cycle;    //the clock num between the negedge of SDA and negedge of SCL for start mark
+      dev->scl_rstart_setup.time = cycle;  //the clock num between the posedge of SCL and the negedge of SDA for restart mark
+
+      dev->scl_stop_hold.time = cycle;     //the clock num after the STOP bit's posedge
+      dev->scl_stop_setup.time = cycle;    //the clock num between the posedge of SCL and the posedge of SDA
+
+      uint32_t halfPeriod = cycle / 2;
+
+      dev->sda_hold.time = halfPeriod;       //the clock num I2C used to hold the data after the negedge of SCL.
+      dev->sda_sample.time = halfPeriod;     //the clock num I2C used to sample data on SDA after the posedge of SCL
 #endif
     }
 

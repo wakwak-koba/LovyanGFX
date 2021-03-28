@@ -451,7 +451,7 @@ namespace lgfx
     {
       do
       {
-        _bus->writeBytes(&b[add * y], w);
+        _bus->writeBytes(&b[add * y], w, true, true);
       } while (++y <= range.bottom);
     }
     /*

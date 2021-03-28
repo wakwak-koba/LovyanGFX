@@ -555,7 +555,7 @@ IT8951 Registers defines
             //_bus->writeData(__builtin_bswap16(buf), 16);
           } while (new_pos != prev_pos);
           _wait_busy();
-          _bus->writeBytes((std::uint8_t*)writebuf, writepos << 1, false);
+          _bus->writeBytes((std::uint8_t*)writebuf, writepos << 1, true, false);
         }
       } while (w != new_pos && w != (prev_pos = param->fp_skip(new_pos, w, param)));
       param->src_x32 = sx;

@@ -107,15 +107,15 @@ namespace lgfx
 
   struct Light_M5StackCore2 : public ILight
   {
-    void init(void) override
+    void init(std::uint8_t brightness) override
     {
-      setBrightness(_brightness);
+      setBrightness(brightness);
     }
 
     void setBrightness(std::uint8_t brightness) override
     {
       using namespace m5stack;
-      _brightness = brightness;
+
       if (brightness)
       {
         brightness = (brightness >> 3) + 72;
@@ -167,18 +167,17 @@ namespace lgfx
 
   struct Light_M5StickC : public ILight
   {
-    void init(void) override
+    void init(std::uint8_t brightness) override
     {
       using namespace m5stack;
       lgfx::i2c::init(axp_i2c_port, axp_i2c_sda, axp_i2c_scl, axp_i2c_freq);
       lgfx::i2c::writeRegister8(axp_i2c_port, axp_i2c_addr, 0x12, 0x4D, ~0);
-      setBrightness(_brightness);
+      setBrightness(brightness);
     }
 
     void setBrightness(std::uint8_t brightness) override
     {
       using namespace m5stack;
-      _brightness = brightness;
       if (brightness)
       {
         brightness = (((brightness >> 1) + 8) / 13) + 5;
@@ -260,7 +259,7 @@ namespace lgfx
     {
       if (_light_last) { delete _light_last; }
       _light_last = bl;
-      light(bl);
+      _panel_last->setLight(bl);
     }
 
     void _set_pwm_backlight(std::int16_t pin, std::uint8_t ch, std::uint32_t freq)
@@ -299,7 +298,6 @@ namespace lgfx
       if (bus_cfg.pin_mosi != -1 && bus_cfg.pin_sclk != -1) return true;
 
       panel(nullptr);
-      light(nullptr);
       touch(nullptr);
 
       if (_panel_last)
@@ -483,8 +481,6 @@ namespace lgfx
             _panel_last = p;
           }
           _set_backlight(new Light_M5StickC());
-
-
 
           goto init_clear;
         }

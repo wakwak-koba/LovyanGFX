@@ -17,6 +17,7 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #include "Panel_Device.hpp"
 #include "../Bus.hpp"
+#include "../Light.hpp"
 #include "../platforms/common.hpp"
 #include "../misc/pixelcopy.hpp"
 
@@ -37,13 +38,17 @@ namespace lgfx
     _bus = bus ? bus : &nullobj;
   }
 
-//----------------------------------------------------------------------------
+  void Panel_Device::setBrightness(std::uint8_t brightness)
+  {
+    if (_light) _light->setBrightness(brightness);
+  }
 
   void Panel_Device::init(bool use_reset)
   {
     _bus->init();
     init_cs();
     init_rst();
+    if (_light) _light->init(0);
     if (use_reset)
     {
       reset();

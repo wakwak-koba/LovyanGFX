@@ -116,14 +116,18 @@ namespace lgfx
   {
     r &= 7;
     _rotation = r;
-    _width  = (r & 1) ? _panel_height : _panel_width;
-    _height = (r & 1) ? _panel_width : _panel_height;
-    _index = _xs = _ys = _xe = _ye = _xpos = _ypos = 0;
+    auto pw = _panel_width;
+    auto ph = _panel_height;
+    if (r & 1)
+    {
+      std::swap(pw, ph);
+    }
+    _width  = pw;
+    _height = ph;
   }
 
   void Panel_Sprite::setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye)
   {
-    _index = xs + ys * _bitwidth;
     _xpos = xs;
     _xs = xs;
     _xe = xe;
@@ -298,7 +302,6 @@ namespace lgfx
 
   void Panel_Sprite::writeBlock(std::uint32_t rawcolor, std::uint32_t length)
   {
-    if (0 >= length) return;
     do
     {
       std::uint32_t h = 1;
@@ -313,76 +316,6 @@ namespace lgfx
       if (_ye < (_ypos += h)) { _ypos = _ys; }
       length -= w * h;
     } while (length);
-
-/*/
-    auto bytes = _write_bits >> 3;
-    if (bytes == 0) {
-      std::int32_t bits = _write_bits;
-      std::uint8_t c = rawcolor;
-      std::int32_t ll;
-      std::int32_t index = _index;
-      do
-      {
-        std::uint8_t* dst = &_img.img8()[index * bits >> 3];
-        ll = std::min<std::uint32_t>(_xe - _xpos + 1, length);
-        std::int32_t w = ll * bits;
-        std::int32_t x = _xpos * bits;
-        std::size_t len = ((x + w) >> 3) - (x >> 3);
-        std::uint8_t mask = 0xFF >> (x & 7);
-        if (!len)
-        {
-          mask ^= mask >> w;
-          *dst = (*dst & ~mask) | (c & mask);
-        } else {
-          if (mask != 0xFF) {
-            *dst = (*dst & ~mask) | (c & mask);
-            ++dst;
-            --len;
-          }
-          if (len) {
-            memset(dst, c, len);
-            dst += len;
-          }
-          mask = 0xFF >> ((x + w) & 7);
-          if (mask != 0xFF) *dst = (*dst & mask) | (c & ~mask);
-        }
-        index = ptr_advance(ll);
-      } while (length -= ll);
-    } else {
-      std::uint8_t c = rawcolor;
-      if (bytes == 1 || (c == ((rawcolor >> 8) & 0xFF) && (bytes == 2 || (c == ((rawcolor >> 16) & 0xFF)))))
-      {
-        std::int32_t ll;
-        std::int32_t index = _index;
-        do {
-          ll = std::min<std::uint32_t>(_xe - _xpos + 1, length);
-          memset(&_img[index * bytes], rawcolor, ll * bytes);
-          index = ptr_advance(ll);
-        } while (length -= ll);
-      }
-      else if (_img.use_memcpy())
-      {
-        std::uint32_t ll;
-        std::uint32_t index = _index;
-        do {
-          ll = std::min<std::uint32_t>(_xe - _xpos + 1, length);
-          memset_multi(&_img[index * bytes], rawcolor, bytes, ll);
-          index = ptr_advance(ll);
-        } while (length -= ll);
-      } else {
-        std::uint32_t buflen = std::min<std::uint32_t>(_xe - _xs + 1, length);
-        std::uint8_t linebuf[buflen * bytes];
-        memset_multi(linebuf, rawcolor, bytes, buflen);
-        std::int32_t ll;
-        std::int32_t index = _index;
-        do  {
-          ll = std::min<std::uint32_t>(_xe - _xpos + 1, length);
-          memcpy(&_img[index * bytes], linebuf, ll * bytes);
-          index = ptr_advance(ll);
-        } while (length -= ll);
-      }
-    }
-//*/
   }
 
   void Panel_Sprite::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool)

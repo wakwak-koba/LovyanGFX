@@ -17,8 +17,7 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #pragma once
 
-#include <vector>
-#include <cstring>
+#include <cstdint>
 
 #include "../../Bus.hpp"
 #include "../common.hpp"

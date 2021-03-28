@@ -212,7 +212,7 @@ namespace lgfx
 
   void Bus_SPI::init(void)
   {
-    dc_h();
+    dc_control(true);
     pinMode(_cfg.pin_dc, pin_mode_t::output);
 
     auto *spi = &_sercom->SPI;
@@ -363,7 +363,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
   void Bus_SPI::endTransaction(void)
   {
     wait_spi();
-    dc_h();
+    dc_control(true);
   }
 
   void Bus_SPI::wait(void)
@@ -379,7 +379,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
   void Bus_SPI::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
     auto *spi = &_sercom->SPI;
-    dc_l();
+    dc_control(false);
     if (bit_length <= 8)
     {
       spi->LENGTH.reg = 1 | SERCOM_SPI_LENGTH_LENEN;
@@ -403,7 +403,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
   {
     auto len = bit_length >> 3 | SERCOM_SPI_LENGTH_LENEN;
     auto *spi = &_sercom->SPI;
-    dc_h();
+    dc_control(true);
     if (!_sercom->SPI.CTRLC.bit.DATA32B) {
       while (spi->SYNCBUSY.reg);
       spi->CTRLA.bit.ENABLE = 0;
@@ -421,7 +421,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
     std::size_t bytes = bit_length >> 3;
     auto *spi = &_sercom->SPI;
     bool d32b = spi->CTRLC.bit.DATA32B;
-    dc_h();
+    dc_control(true);
     if (!d32b) {
       while (spi->SYNCBUSY.reg);
       spi->CTRLA.bit.ENABLE = 0;
@@ -498,11 +498,11 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
       if (limit <= 512) limit <<= 1;
       auto dmabuf = _flip_buffer.getBuffer(len * dst_bytes);
       param->fp_copy(dmabuf, 0, len, param);
-      writeBytes(dmabuf, len * dst_bytes, true);
+      writeBytes(dmabuf, len * dst_bytes, true, true);
     } while (length -= len);
   }
 
-  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma)
+  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
     auto *spi = &_sercom->SPI;
 #if defined (ARDUINO)
@@ -524,7 +524,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
 
       auto desc = _dma_write_desc;
       std::uint32_t len = length;
-      dc_h();
+      dc_control(dc);
       spi->LENGTH.reg = 0;
       desc->BTCTRL.bit.BEATSIZE  = beatsize;
       desc->SRCADDR.reg = (std::uint32_t)data + length;
@@ -548,7 +548,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
     }
 #endif
 
-    dc_h();
+    dc_control(dc);
     if (!spi->CTRLC.bit.DATA32B) {
       while (spi->SYNCBUSY.reg);
       spi->CTRLA.bit.ENABLE = 0;

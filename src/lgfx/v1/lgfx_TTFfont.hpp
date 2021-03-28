@@ -29,6 +29,9 @@ namespace lgfx
     bool getUnicodeIndex(std::uint16_t unicode, std::uint16_t *index) const;
 
   private:
+
+    bool tt_face_build_cmaps( void );
+
     struct TTC_HeaderRec
     {
       std::int32_t version = 0;
@@ -104,45 +107,93 @@ namespace lgfx
 
     struct TT_HoriHeader
     {
-      std::int32_t Version;
-      std::int16_t Ascender;
-      std::int16_t Descender;
-      std::int16_t Line_Gap;
-      std::uint16_t advance_Width_Max;      /* advance width maximum */
-      std::int16_t min_Left_Side_Bearing;  /* minimum left-sb       */
-      std::int16_t min_Right_Side_Bearing; /* minimum right-sb      */
-      std::int16_t xMax_Extent;            /* xmax extents          */
+      union
+      {
+        std::int32_t Version;
+        std::int16_t Ascender;
+        std::int16_t Descender;
+        std::int16_t Line_Gap;
+        struct
+        {
+          std::uint16_t advance_Width_Max;      /* advance width maximum */
+          std::int16_t min_Left_Side_Bearing;  /* minimum left-sb       */
+          std::int16_t min_Right_Side_Bearing; /* minimum right-sb      */
+          std::int16_t xMax_Extent;            /* xmax extents          */
+        };
+        struct
+        {
+          std::uint16_t advance_Height_Max;      /* advance height maximum */
+          std::int16_t min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
+          std::int16_t min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
+          std::int16_t yMax_Extent;             /* xmax or ymax extents            */
+        };
+      };
       std::int16_t caret_Slope_Rise;
       std::int16_t caret_Slope_Run;
       std::int16_t caret_Offset;
       std::int16_t Reserved[4];
       std::int16_t metric_Data_Format;
-      std::uint16_t number_Of_HMetrics;
-
+      union
+      {
+        std::uint16_t number_Of_HMetrics;
+        std::uint16_t number_Of_VMetrics;
+      };
       void* long_metrics;
       void* short_metrics;
       void load(DataWrapper* data);
     };
-    struct TT_VertHeader
-    {
-      std::int32_t Version;
-      std::int16_t Ascender;
-      std::int16_t Descender;
-      std::int16_t Line_Gap;
-      std::uint16_t advance_Height_Max;      /* advance height maximum */
-      std::int16_t min_Top_Side_Bearing;    /* minimum left-sb or top-sb       */
-      std::int16_t min_Bottom_Side_Bearing; /* minimum right-sb or bottom-sb   */
-      std::int16_t yMax_Extent;             /* xmax or ymax extents            */
-      std::int16_t caret_Slope_Rise;
-      std::int16_t caret_Slope_Run;
-      std::int16_t caret_Offset;
-      std::int16_t Reserved[4];
-      std::int16_t metric_Data_Format;
-      std::uint16_t number_Of_VMetrics;
 
-      void* long_metrics;
-      void* short_metrics;
+    struct TT_OS2
+    {
+      std::uint16_t version;
+      std::int16_t  xAvgCharWidth;
+      std::uint16_t usWeightClass;
+      std::uint16_t usWidthClass;
+      std::int16_t  fsType;
+      std::int16_t  ySubscriptXSize;
+      std::int16_t  ySubscriptYSize;
+      std::int16_t  ySubscriptXOffset;
+      std::int16_t  ySubscriptYOffset;
+      std::int16_t  ySuperscriptXSize;
+      std::int16_t  ySuperscriptYSize;
+      std::int16_t  ySuperscriptXOffset;
+      std::int16_t  ySuperscriptYOffset;
+      std::int16_t  yStrikeoutSize;
+      std::int16_t  yStrikeoutPosition;
+      std::int16_t  sFamilyClass;
+      std::uint8_t  panose[10];
+      std::uint32_t ulUnicodeRange1;
+      std::uint32_t ulUnicodeRange2;
+      std::uint32_t ulUnicodeRange3;
+      std::uint32_t ulUnicodeRange4;
+      std::uint8_t achVendID[4];
+
+      std::uint16_t fsSelection;
+      std::uint16_t usFirstCharIndex;
+      std::uint16_t usLastCharIndex;
+      std::int16_t  sTypoAscender;
+      std::int16_t  sTypoDescender;
+      std::int16_t  sTypoLineGap;
+      std::uint16_t usWinAscent;
+      std::uint16_t usWinDescent;
+
+      // only version 1 tables:
+      std::uint32_t ulCodePageRange1;
+      std::uint32_t ulCodePageRange2;
+
+      // only version 2 tables:
+      std::int16_t  sxHeight;
+      std::int16_t  sCapHeight;
+      std::uint16_t usDefaultChar;
+      std::uint16_t usBreakChar;
+      std::uint16_t usMaxContext;
+
       void load(DataWrapper* data);
+    };
+    struct cmap_t  // 自作
+    {
+      std::uint16_t* rawdata = nullptr;
+      bool load(DataWrapper* data);
     };
 
 #define FT_ENC_TAG( value, a, b, c, d )         \
@@ -194,16 +245,18 @@ namespace lgfx
     TT_HoriHeader _horizontal;   /* TrueType horizontal header     */
     TT_MaxProfile _max_profile;
     bool          _vertical_info = false;
-    TT_VertHeader _vertical;     /* TT Vertical header, if present */
+    TT_HoriHeader _vertical;     /* TT Vertical header, if present */
+    TT_OS2        _os2;
 
     TT_TableRec* _dir_tables = nullptr;
-    std::uint8_t* _cmap_table = nullptr;
-    std::uint32_t _cmap_size = 0;
+    //std::uint8_t* _cmap_table = nullptr;
+    //std::uint32_t _cmap_size = 0;
+    cmap_t _cmap;
 
-    std::uint32_t horz_metrics_size;
-    std::uint32_t horz_metrics_offset;
-    std::uint32_t vert_metrics_size;
-    std::uint32_t vert_metrics_offset;
+    std::uint32_t _horz_metrics_size;
+    std::uint32_t _horz_metrics_offset;
+    std::uint32_t _vert_metrics_size;
+    std::uint32_t _vert_metrics_offset;
 
     TT_TableRec* tt_face_lookup_table(std::uint32_t tag);
     bool tt_face_goto_table( std::uint32_t tag

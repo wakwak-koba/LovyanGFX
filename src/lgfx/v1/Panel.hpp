@@ -73,6 +73,8 @@ namespace lgfx
     virtual void endTransaction(void) = 0;
     virtual void init(bool use_reset) = 0;
 
+    virtual void setBrightness(std::uint8_t brightness) {};
+
     virtual color_depth_t setColorDepth(color_depth_t depth) = 0;
 
     virtual void setInvert(bool invert) = 0;

@@ -34,6 +34,7 @@ namespace lgfx
       _cfg.readable = false;
     }
 
+    void setBrightness(std::uint8_t brightness) override;
     void setInvert(bool invert) override;
     void setSleep(bool flg) override;
     void setPowerSave(bool flg) override;
@@ -93,15 +94,27 @@ namespace lgfx
           CMD_POWERMODE     , 0, 0x0B, 0,
           CMD_PRECHARGE     , 0, 0x31, 0,
           CMD_CLOCKDIV      , 0, 0xF0, 0,
+
+          CMD_PRECHARGEA    , 0, 0x64, 0,
+          CMD_PRECHARGEB    , 0, 0x78, 0,
+          CMD_PRECHARGEC    , 0, 0x64, 0,
+/*
           CMD_PRECHARGEA    , 0, 0x64, 0,
           CMD_PRECHARGEB    , 0, 0x78, 0,
           CMD_PRECHARGEC    , 0, 0x64, 0,
           CMD_PRECHARGELEVEL, 0, 0x3A, 0,
+*/
+          CMD_PRECHARGEA    , 0, 0x80, 0,
+          CMD_PRECHARGEB    , 0, 0x80, 0,
+          CMD_PRECHARGEC    , 0, 0x80, 0,
+          CMD_PRECHARGELEVEL, 0, 0x1A, 0,
           CMD_VCOMH         , 0, 0x3E, 0,
+/*
           CMD_MASTERCURRENT , 0, 0x06, 0,
           CMD_CONTRASTA     , 0, 0x91, 0,
           CMD_CONTRASTB     , 0, 0x50, 0,
           CMD_CONTRASTC     , 0, 0x7D, 0,
+*/
           CMD_FILL          , 0, 0x01, 0,
           CMD_DISPLAYON     , 0,
           0xFF,0xFF, // end

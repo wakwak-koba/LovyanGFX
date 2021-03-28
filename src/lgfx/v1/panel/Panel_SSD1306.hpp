@@ -26,32 +26,26 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  struct Panel_SSD1306 : public Panel_Device
+  struct Panel_1bitOLED : public Panel_Device
   {
-    Panel_SSD1306(void) : Panel_Device()
+    Panel_1bitOLED(void) : Panel_Device()
     {
-      _cfg.memory_width  = _cfg.panel_width  = 128;
-      _cfg.memory_height = _cfg.panel_height = 64;
-      _cfg.dummy_read_bits = 0;
       _auto_display = true;
     }
-
-    virtual ~Panel_SSD1306(void);
+    virtual ~Panel_1bitOLED(void);
 
     void beginTransaction(void) override;
     void endTransaction(void) override;
     void init(bool use_reset) override;
 
+    void waitDisplay(void) override;
+    bool displayBusy(void) override;
     color_depth_t setColorDepth(color_depth_t depth) override;
-
     void setRotation(std::uint_fast8_t r) override;
+
     void setInvert(bool invert) override;
     void setSleep(bool flg) override;
     void setPowerSave(bool flg) override {}
-
-    void waitDisplay(void) override;
-    bool displayBusy(void) override;
-    void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override;
 
     void writeBlock(std::uint32_t rawcolor, std::uint32_t len) override;
     void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) override;
@@ -65,7 +59,15 @@ namespace lgfx
 
     void readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param) override;
 
-  private:
+  protected:
+
+    static constexpr std::uint8_t CMD_DISPLAYALLON_RESUME = 0xA4;
+    static constexpr std::uint8_t CMD_DISPLAYALLON        = 0xA5;
+    static constexpr std::uint8_t CMD_NORMALDISPLAY       = 0xA6;
+    static constexpr std::uint8_t CMD_INVERTDISPLAY       = 0xA7;
+    static constexpr std::uint8_t CMD_SETMULTIPLEX        = 0xA8;
+    static constexpr std::uint8_t CMD_DISP_OFF            = 0xAE;
+    static constexpr std::uint8_t CMD_DISP_ON             = 0xAF;
 
     std::uint8_t* _buf = nullptr;
 
@@ -77,46 +79,145 @@ namespace lgfx
     bool _read_pixel(std::int32_t x, std::int32_t y);
     void _update_transferred_rect(std::uint32_t &xs, std::uint32_t &ys, std::uint32_t &xe, std::uint32_t &ye);
 
-    static constexpr std::uint8_t CMD_MEMORYMODE = 0x20;
+  };
 
-    static constexpr std::uint8_t CMD_COLUMNADDR = 0x21;
-    static constexpr std::uint8_t CMD_PAGEADDR   = 0x22;
+  struct Panel_SSD1306 : public Panel_1bitOLED
+  {
+    Panel_SSD1306(void) : Panel_1bitOLED()
+    {
+      _cfg.memory_width  = _cfg.panel_width  = 128;
+      _cfg.memory_height = _cfg.panel_height = 64;
+    }
+
+    void setBrightness(std::uint8_t brightness) override;
+
+    void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override;
+
+  protected:
+
+    static constexpr std::uint8_t CMD_MEMORYMODE  = 0x20;
+
+    static constexpr std::uint8_t CMD_COLUMNADDR  = 0x21;
+    static constexpr std::uint8_t CMD_PAGEADDR    = 0x22;
 
     static constexpr std::uint8_t CMD_SETSTARTLINE= 0x40;
-    static constexpr std::uint8_t CMD_DISP_OFF   = 0xAE;
-    static constexpr std::uint8_t CMD_DISP_ON    = 0xAF;
-    static constexpr std::uint8_t CMD_SETCONTRAST= 0x81;
-    static constexpr std::uint8_t CMD_CHARGEPUMP = 0x8D;
-    static constexpr std::uint8_t CMD_SEGREMAP   = 0xA0;
-    static constexpr std::uint8_t CMD_SETMLTPLX  = 0xA8;
-    static constexpr std::uint8_t CMD_COMSCANDEC = 0xC8;
-    static constexpr std::uint8_t CMD_SETOFFSET  = 0xD3;
-    static constexpr std::uint8_t CMD_SETCLKDIV  = 0xD5;
-    static constexpr std::uint8_t CMD_SETPRECHG  = 0xD9;
-    static constexpr std::uint8_t CMD_SETCOMPINS = 0xDA;
-    static constexpr std::uint8_t CMD_SETVCOMDET = 0xDB;
+    static constexpr std::uint8_t CMD_SETCONTRAST = 0x81;
+    static constexpr std::uint8_t CMD_CHARGEPUMP  = 0x8D;
+    static constexpr std::uint8_t CMD_SEGREMAP    = 0xA0;
+//  static constexpr std::uint8_t CMD_SETMLTPLX   = 0xA8;
+    static constexpr std::uint8_t CMD_COMSCANINC  = 0xC0;
+//  static constexpr std::uint8_t CMD_COMSCANDEC  = 0xC8;
+    static constexpr std::uint8_t CMD_SETOFFSET   = 0xD3;
+    static constexpr std::uint8_t CMD_SETCLKDIV   = 0xD5;
+    static constexpr std::uint8_t CMD_SETPRECHG   = 0xD9;
+    static constexpr std::uint8_t CMD_SETCOMPINS  = 0xDA;
+    static constexpr std::uint8_t CMD_SETVCOMDET  = 0xDB;
 
-    static constexpr std::uint8_t CMD_DISPLAYALLON_RESUME = 0xA4;
-    static constexpr std::uint8_t CMD_NORMALDISPLAY = 0xA6;
-    static constexpr std::uint8_t CMD_INVERTDISPLAY = 0xA7;
-    static constexpr std::uint8_t CMD_DEACTIVATE_SCROLL = 0x2E;
+    static constexpr std::uint8_t CMD_DEACTIVATE_SCROLL   = 0x2E;
 
     const std::uint8_t* getInitCommands(std::uint8_t listno) const override
     {
       static constexpr std::uint8_t list0[] = {
-          CMD_DISP_OFF   , 0,
-          CMD_SETCLKDIV  , 0, 0x80, 0,
-          CMD_SETMLTPLX  , 0, 0x3F, 0,
-          CMD_SETOFFSET  , 0, 0x00, 0,
-          CMD_SETSTARTLINE, 0,
-          CMD_MEMORYMODE , 0, 0x00, 0,
-          CMD_SEGREMAP|1 , 0,
-          CMD_COMSCANDEC , 0,
-          CMD_SETCOMPINS , 0, 0x12, 0,
-          CMD_SETVCOMDET , 0, 0x40, 0,
-          CMD_DISPLAYALLON_RESUME, 0,
-          CMD_DEACTIVATE_SCROLL, 0,
-          CMD_DISP_ON    , 0,
+          CMD_DISP_OFF           ,
+          CMD_SETCLKDIV          , 0x80,
+          CMD_SETMULTIPLEX       , 0x3F,
+          CMD_SETOFFSET          , 0x00,
+          CMD_SETSTARTLINE       ,
+          CMD_MEMORYMODE         , 0x00,
+          CMD_SEGREMAP           ,
+          CMD_COMSCANINC         ,
+          CMD_SETCOMPINS         , 0x12,
+          CMD_SETVCOMDET         , 0x10,
+          CMD_DISPLAYALLON_RESUME,
+          CMD_DEACTIVATE_SCROLL  ,
+          CMD_CHARGEPUMP         , 0x14,
+          CMD_DISP_ON            ,
+          CMD_SETCONTRAST        , 0x00,
+          CMD_SETPRECHG          , 0x11,
+          0xFF,0xFF, // end
+      };
+      switch (listno) {
+      case 0: return list0;
+      default: return nullptr;
+      }
+    }
+  };
+
+  struct Panel_SH110x : public Panel_SSD1306
+  {
+    Panel_SH110x(void)
+    {
+      _cfg.memory_width  = _cfg.panel_width  = 128;
+      _cfg.memory_height = _cfg.panel_height = 128;
+      _auto_display = true;
+    }
+
+    void init(bool use_reset) override;
+
+    void beginTransaction(void) override;
+
+    void setBrightness(std::uint8_t brightness) override;
+
+    void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override;
+
+  protected:
+    static constexpr std::uint8_t CMD_PAGEADDRESSINGMODE  = 0x20;
+    static constexpr std::uint8_t CMD_VERTADDRESSINGMODE  = 0x21;
+    static constexpr std::uint8_t CMD_PAGEADDR            = 0x22;
+    static constexpr std::uint8_t CMD_SETCONTRAST         = 0x81;
+//  static constexpr std::uint8_t CMD_CHARGEPUMP          = 0x8D;
+    static constexpr std::uint8_t CMD_SEGREMAP            = 0xA0;
+    static constexpr std::uint8_t CMD_DCDC                = 0xAD;
+    static constexpr std::uint8_t CMD_SETPAGEADDR         = 0xB0;
+    static constexpr std::uint8_t CMD_COMSCANINC          = 0xC0;
+    static constexpr std::uint8_t CMD_COMSCANDEC          = 0xC8;
+    static constexpr std::uint8_t CMD_SETDISPLAYOFFSET    = 0xD3;
+    static constexpr std::uint8_t CMD_SETDISPLAYCLOCKDIV  = 0xD5;
+    static constexpr std::uint8_t CMD_SETPRECHARGE        = 0xD9;
+    static constexpr std::uint8_t CMD_SETCOMPINS          = 0xDA;
+    static constexpr std::uint8_t CMD_SETVCOMDETECT       = 0xDB;
+    static constexpr std::uint8_t CMD_SETDISPSTARTLINE    = 0xDC;
+    static constexpr std::uint8_t CMD_SETLOWCOLUMN        = 0x00;
+    static constexpr std::uint8_t CMD_SETHIGHCOLUMN       = 0x10;
+    static constexpr std::uint8_t CMD_READMODIFYWRITE     = 0xE0;
+    static constexpr std::uint8_t CMD_READMODIFYWRITE_END = 0xEE;
+
+    const std::uint8_t* getInitCommands(std::uint8_t listno) const override
+    {
+      static constexpr std::uint8_t list0[] = {
+        CMD_DISP_OFF   ,
+        CMD_READMODIFYWRITE_END,
+        CMD_PAGEADDRESSINGMODE ,
+        CMD_SETDISPSTARTLINE   , 0x00,
+        CMD_SETDISPLAYCLOCKDIV , 0x50,
+        CMD_DCDC               , 0x8A,
+        CMD_SEGREMAP           ,
+        CMD_COMSCANINC         ,
+        CMD_SETPRECHARGE       , 0x20,
+        CMD_SETVCOMDETECT      , 0x35,
+        CMD_DISPLAYALLON_RESUME,
+        CMD_SETCONTRAST, 0x00,
+        CMD_DISP_ON    ,
+/*
+//
+
+CMD_INVERTDISPLAY ,
+
+          0xd5, 0x51,
+          CMD_PAGEADDRESSINGMODE,
+          CMD_SETCONTRAST       , 0x4F,
+          0xAD, 0x8A,
+          0xA0, 
+          0xC0, 
+          0xDC, 0x00,
+          0xd3, 0x60,
+          0xd9, 0x22,
+          0xdb, 0x35,
+          0xa8, 0x3f,
+          0xa4, 
+          0xa6, 
+CMD_DISPLAYON,
+//*/
           0xFF,0xFF, // end
       };
       switch (listno) {

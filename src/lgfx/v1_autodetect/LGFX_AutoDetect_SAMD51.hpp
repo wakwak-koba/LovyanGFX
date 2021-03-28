@@ -36,7 +36,7 @@ namespace lgfx
 
   struct Light_WioTerminal : public ILight
   {
-    void init(void) override
+    void init(std::uint8_t brightness) override
     {
       /* Enable Peripheral Clocks */
       GCLK->PCHCTRL[9].reg = 0 | (1u<<6);         // TC0, TC1
@@ -70,7 +70,7 @@ namespace lgfx
       TC0->COUNT8.WAVE.reg  = 0x02; // WAVEGEN=NPWM;
       TC0->COUNT8.CTRLBSET.reg = (1u<<1); // LUPD
       TC0->COUNT8.PER.reg = 255;  // this->maxBrightness;
-      TC0->COUNT8.CC[0].reg = _brightness;
+      TC0->COUNT8.CC[0].reg = brightness;
       TC0->COUNT8.CC[1].reg = 0u;
       TC0->COUNT8.DBGCTRL.bit.DBGRUN = 1;
       TC0->COUNT8.INTFLAG.reg = 0x33;    // Clear all flags
@@ -82,8 +82,6 @@ namespace lgfx
 
     void setBrightness(std::uint8_t brightness) override
     {
-      _brightness = brightness;
-      if (_sleep) brightness = 0;
       TC0->COUNT8.CC[0].reg = brightness;
       while(TC0->COUNT8.SYNCBUSY.bit.CC0);
     }

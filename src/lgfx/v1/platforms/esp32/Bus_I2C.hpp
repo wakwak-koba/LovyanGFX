@@ -29,29 +29,26 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  class Bus_SPI : public IBus
+  class Bus_I2C : public IBus
   {
   public:
     struct config_t
     {
-      std::uint32_t freq_write = 16000000;
-      std::uint32_t freq_read  =  8000000;
-      //bool spi_3wire = true;
-      //bool use_lock = true;
-      std::int16_t pin_sclk = -1;
-      std::int16_t pin_miso = -1;
-      std::int16_t pin_mosi = -1;
-      std::int16_t pin_dc   = -1;
-      std::uint8_t spi_mode = 0;
-      SPI_TypeDef *spi_port = SPI1;
-      DMA_TypeDef *dma_port = DMA1;
+      std::uint32_t freq = 400000;
+      std::int16_t pin_scl = 22;
+      std::int16_t pin_sda = 21;
+      std::uint8_t i2c_port = 0;      // e.g. ESP32 0=I2C_NUM_0 / 1=I2C_NUM_1
+      std::uint8_t i2c_addr = 0x3C;
+      std::uint32_t prefix_cmd = 0x00;
+      std::uint32_t prefix_data = 0x40;
+      std::uint32_t prefix_len = 1;
     };
 
     const config_t& config(void) const { return _cfg; }
 
     void config(const config_t& config);
 
-    bus_type_t busType(void) const override { return bus_type_t::bus_spi; }
+    bus_type_t busType(void) const override { return bus_type_t::bus_i2c; }
 
     void init(void) override;
     void release(void) override;
@@ -62,13 +59,14 @@ namespace lgfx
     bool busy(void) const override;
 
     void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
+    void writeCommand(const std::uint8_t* data, std::uint32_t length);
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
     void writePixels(pixelcopy_t* param, std::uint32_t length) override;
     void writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma) override;
 
     void initDMA(void) {}
-    void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override { writeBytes(data, length, true); }
+    void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override { writeBytes(data, length, true, true); }
     void execDMAQueue(void) {}
     std::uint8_t* getDMABuffer(std::uint32_t length) override { return _flip_buffer.getBuffer(length); }
 
@@ -80,56 +78,9 @@ namespace lgfx
 
   private:
 
-#if defined(STM32H7xx) || defined(STM32MP1xx)
-      static constexpr std::uint32_t sr_mask = SPI_SR_TXP;
-#else
-      static constexpr std::uint32_t sr_mask = SPI_SR_TXE;
-#endif
-
-    __attribute__ ((always_inline)) inline void wait_spi(void)
-    {
-      volatile std::uint32_t *spisr = &_cfg.spi_port->SR;
-      do {} while (*spisr & SPI_SR_BSY);
-    }
-
-    __attribute__ ((always_inline)) inline void dc_control(bool flg)
-    {
-      auto gpio_reg_dc = _gpio_reg_dc;
-      auto mask_reg_dc = flg ? _mask_reg_dc_h : _mask_reg_dc_l;
-      volatile std::uint32_t *spisr = &_cfg.spi_port->SR;
-      do {} while (*spisr & SPI_SR_BSY);
-      *gpio_reg_dc = mask_reg_dc;
-    }
-/*
-    __attribute__ ((always_inline)) inline void dc_h(void)
-    {
-      auto gpio_reg_dc = _gpio_reg_dc;
-      auto mask_reg_dc = _mask_reg_dc_h;
-      volatile std::uint32_t *spisr = &_cfg.spi_port->SR;
-      do {} while (*spisr & SPI_SR_BSY);
-      *gpio_reg_dc = mask_reg_dc;
-    }
-
-    __attribute__ ((always_inline)) inline void dc_l(void)
-    {
-      auto gpio_reg_dc = _gpio_reg_dc;
-      auto mask_reg_dc = _mask_reg_dc_l;
-      volatile std::uint32_t *spisr = &_cfg.spi_port->SR;
-      do {} while (*spisr & SPI_SR_BSY);
-      *gpio_reg_dc = mask_reg_dc;
-    }
-//*/
     config_t _cfg;
     FlipBuffer _flip_buffer;
     bool _need_wait;
-    std::uint32_t _mask_reg_dc_h;
-    std::uint32_t _mask_reg_dc_l;
-    std::uint32_t _last_apb_freq = -1;
-    std::uint32_t _clkdiv_write;
-    std::uint32_t _clkdiv_read;
-    volatile std::uint32_t* _gpio_reg_dc;
-    DMA_HandleTypeDef _dmaHal;
-    SPI_HandleTypeDef _spiHal;
   };
 
 //----------------------------------------------------------------------------

@@ -114,7 +114,7 @@ namespace lgfx
 
   void Bus_SPI::endTransaction(void)
   {
-    dc_h();
+    dc_control(true);
     SPI.endTransaction();
   }
 
@@ -146,7 +146,7 @@ namespace lgfx
     if (0 == (bit_length >>= 3)) return;
     auto spidr = reinterpret_cast<volatile uint8_t*>(&_cfg.spi_port->DR);
     auto spisr = &_cfg.spi_port->SR;
-    dc_l();
+    dc_control(false);
     *spidr = data;
     while (--bit_length)
     {
@@ -161,7 +161,7 @@ namespace lgfx
     if (0 == (bit_length >>= 3)) return;
     auto spidr = reinterpret_cast<volatile uint8_t*>(&_cfg.spi_port->DR);
     auto spisr = &_cfg.spi_port->SR;
-    dc_h();
+    dc_control(true);
     *spidr = data;
     while (--bit_length)
     {
@@ -193,7 +193,7 @@ namespace lgfx
       buf[0] = data       | data << 24;
       buf[1] = data >>  8 | data << 16;
       buf[2] = data >> 16 | data <<  8;
-      dc_h();
+      dc_control(true);
       do
       {
         do {} while (!(*spisr & sr_mask));
@@ -230,7 +230,7 @@ namespace lgfx
         fillpos += fillpos;
       }
 
-      writeBytes(dmabuf, len * dst_bytes, true);
+      writeBytes(dmabuf, len * dst_bytes, true, true);
     } while (length -= len);
 //*/
   }
@@ -246,13 +246,14 @@ namespace lgfx
       if (limit <= 512) limit <<= 1;
       auto dmabuf = _flip_buffer.getBuffer(len * dst_bytes);
       param->fp_copy(dmabuf, 0, len, param);
-      writeBytes(dmabuf, len * dst_bytes, true);
+      writeBytes(dmabuf, len * dst_bytes, true, true);
     } while (length -= len);
   }
 
-  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma)
+  void Bus_SPI::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
-    dc_h();
+    dc_control(dc);
+
     if (length < 16)
     {
       SPI.transfer(const_cast<std::uint8_t*>(data), length);

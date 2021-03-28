@@ -84,7 +84,7 @@ namespace lgfx
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
     void writePixels(pixelcopy_t* pc, std::uint32_t length) override;
-    void writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma) override;
+    void writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma) override;
 
     void initDMA(void) override;
     void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override;

@@ -35,6 +35,7 @@ Contributors:
 #include "v1/panel/Panel_ST7735.hpp"
 #include "v1/panel/Panel_ST7789.hpp"
 #include "v1/panel/Panel_ST7796.hpp"
+#include "v1/panel/Panel_M5UnitLCD.hpp"
 #include "v1/panel/Panel_GDEW0154M09.hpp"
 #include "v1/panel/Panel_IT8951.hpp"
 #include "v1/touch/Touch_FT5x06.hpp"

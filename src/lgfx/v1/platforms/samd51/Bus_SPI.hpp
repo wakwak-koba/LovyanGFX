@@ -74,10 +74,10 @@ namespace lgfx
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
     void writePixels(pixelcopy_t* param, std::uint32_t length) override;
-    void writeBytes(const std::uint8_t* data, std::uint32_t length, bool use_dma) override;
+    void writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma) override;
 
     void initDMA(void) {}
-    void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override { writeBytes(data, length, true); }
+    void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override { writeBytes(data, length, true, true); }
     void execDMAQueue(void) {}
     std::uint8_t* getDMABuffer(std::uint32_t length) override { return _flip_buffer.getBuffer(length); }
 
@@ -97,18 +97,13 @@ namespace lgfx
     __attribute__ ((always_inline)) inline void set_clock_write(void) { setFreqDiv(_clkdiv_write); }
     __attribute__ ((always_inline)) inline void set_clock_read(void)  { setFreqDiv(_clkdiv_read ); }
     __attribute__ ((always_inline)) inline void wait_spi(void) { if (_need_wait != true) return; auto *intflag = &_sercom->SPI.INTFLAG.bit; while (intflag->TXC == 0); }
-    __attribute__ ((always_inline)) inline void dc_h(void) {
+    __attribute__ ((always_inline)) inline void dc_control(bool flg)
+    {
       auto mask_reg_dc = _mask_reg_dc;
-      auto gpio_reg_dc_h = _gpio_reg_dc_h;
+      auto gpio_reg_dc = flg ? _gpio_reg_dc_h : _gpio_reg_dc_l;
       wait_spi();
-      *gpio_reg_dc_h = mask_reg_dc;
-    }
-    __attribute__ ((always_inline)) inline void dc_l(void) {
-      auto mask_reg_dc = _mask_reg_dc;
-      auto gpio_reg_dc_l = _gpio_reg_dc_l;
-      wait_spi();
-      *gpio_reg_dc_l = mask_reg_dc;
-    }
+      *gpio_reg_dc = mask_reg_dc;
+    }      
 
     config_t _cfg;
     FlipBuffer _flip_buffer;
