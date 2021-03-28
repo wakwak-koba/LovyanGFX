@@ -61,6 +61,18 @@ public:
       _panel_instance.bus(&_bus_instance);  // Set bus to panel. バスをパネルにセット
     }
 
+    { // バックライト制御が不要な場合はこの処理をまるごと省略してよい
+      auto cfg = _light_instance.config();
+
+      cfg.pin_bl = 32;     /// バックライトが接続されているピン番号
+      cfg.invert = false;  /// バックライトの輝度を反転させる場合 true
+      cfg.freq   = 44100;  /// バックライトのPWM周波数
+      cfg.pwm_channel = 7; /// 使用するPWMのチャンネル番号
+
+      _light_instance.config(cfg);
+      _panel_instance.setLight(&_light_instance);             // Set the backlight to be used. 使用するバックライトをセット
+    }
+
     {
       auto cfg = _panel_instance.config();  // Set config params of panel.  パネルの設定値を取得
 
@@ -84,16 +96,6 @@ public:
 
       _panel_instance.config(cfg);
     }
-    {
-      auto cfg = _light_instance.config();
-
-      cfg.pin_bl = 32;     /// バックライトが接続されているピン番号
-      cfg.invert = false;  /// バックライトの輝度を反転させる場合 true
-      cfg.freq   = 44100;  /// バックライトのPWM周波数
-      cfg.pwm_channel = 7; /// 使用するPWMのチャンネル番号
-
-      _light_instance.config(cfg);
-    }
 /*
     {
       auto cfg = _touch_instance.config();
@@ -104,7 +106,6 @@ public:
 //*/
 
     setPanel(&_panel_instance);             // Set the display panel to be used. 使用するパネルをセット
-    setLight(&_light_instance);             // Set the backlight to be used. 使用するバックライトをセット
 //  setTouch(&_touch_instance);             // Set the touchscreen to be used. 使用するタッチパネルをセット
 
 
