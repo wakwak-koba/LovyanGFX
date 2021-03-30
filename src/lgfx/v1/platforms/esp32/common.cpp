@@ -286,7 +286,7 @@ namespace lgfx
       gpio_hi(spi_cs);
     }
 
-    void writeData(int spi_host, const std::uint8_t* data, std::uint32_t len)
+    void writeData(int spi_host, const std::uint8_t* data, std::size_t len)
     {
       std::uint32_t spi_port = (spi_host + 1);
       if (len > 64) len = 64;
@@ -296,7 +296,7 @@ namespace lgfx
       while (READ_PERI_REG(SPI_CMD_REG(spi_port)) & SPI_USR);
     }
 
-    void readData(int spi_host, std::uint8_t* data, std::uint32_t len)
+    void readData(int spi_host, std::uint8_t* data, std::size_t len)
     {
       std::uint32_t spi_port = (spi_host + 1);
       if (len > 64) len = 64;
@@ -336,7 +336,7 @@ namespace lgfx
 
     void setClock(int i2c_port, int clk_speed)
     {
-#if 0 //defined (ARDUINO) // Arduino ESP32
+#if defined (ARDUINO) // Arduino ESP32
       auto &twowire = (i2c_port) ? Wire1 : Wire;
       twowire.setClock(clk_speed);
 #else
@@ -397,7 +397,7 @@ namespace lgfx
 #endif
     }
 
-    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::uint8_t len)
+    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::size_t len)
     {
 #if defined (ARDUINO) // Arduino ESP32
       auto &twowire = (i2c_port) ? Wire1 : Wire;
@@ -415,9 +415,9 @@ namespace lgfx
 
       return result == ESP_OK;
 #endif
-    }
+   }
 
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::uint8_t readlen)
+    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen)
     {
 #if defined (ARDUINO) // Arduino ESP32
       auto &twowire = (i2c_port) ? Wire1 : Wire;
@@ -440,7 +440,7 @@ namespace lgfx
 #endif
     }
 
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::uint8_t len)
+    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t len)
     {
 #if defined (ARDUINO) // Arduino ESP32
       auto &twowire = (i2c_port) ? Wire1 : Wire;

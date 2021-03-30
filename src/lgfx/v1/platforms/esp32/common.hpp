@@ -222,8 +222,8 @@ public:
     void beginTransaction(int spi_host, int freq, int spi_mode = 0);
     void beginTransaction(int spi_host);
     void endTransaction(int spi_host);
-    void writeData(int spi_host, const std::uint8_t* data, std::uint32_t len);
-    void readData(int spi_host, std::uint8_t* data, std::uint32_t len);
+    void writeData(int spi_host, const std::uint8_t* data, std::size_t length);
+    void readData(int spi_host, std::uint8_t* data, std::size_t length);
   }
 
 
@@ -231,9 +231,9 @@ public:
   {
     void init(int i2c_port, int pin_sda, int pin_scl, int freq);
     void setClock(int i2c_port, int freq);
-    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::uint8_t len);
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::uint8_t readlen);
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::uint8_t len);
+    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::size_t length);
+    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen);
+    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length);
     bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask = 0);
     inline bool bitOn(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit)  { return writeRegister8(i2c_port, addr, reg, bit, ~0); }
     inline bool bitOff(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit) { return writeRegister8(i2c_port, addr, reg, 0, ~bit); }

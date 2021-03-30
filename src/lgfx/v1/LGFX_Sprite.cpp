@@ -460,6 +460,15 @@ namespace lgfx
 
   void Panel_Sprite::copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y)
   {
+    auto r = _rotation;
+    if (r)
+    {
+      if (r & 4)     { src_y = _height - (src_y + h); dst_y = _height - (dst_y + h); }
+      if (r & 1)     { std::swap(src_x, src_y);  std::swap(dst_x, dst_y);  std::swap(w, h); }
+      if ((r+1) & 2) { src_x = _panel_width  - (src_x + w); dst_x = _panel_width  - (dst_x + w); }
+      if (r     & 2) { src_y = _panel_height - (src_y + h); dst_y = _panel_height - (dst_y + h); }
+    }
+
     if (_write_bits < 8) {
       pixelcopy_t param(_img, _write_depth, _write_depth);
       param.src_bitwidth = _bitwidth;

@@ -24,16 +24,6 @@ namespace lgfx
  inline namespace v1
  {
 //----------------------------------------------------------------------------
-  struct Panel_WioTerminal : public Panel_ILI9341
-  {
-    Panel_WioTerminal(void) : Panel_ILI9341()
-    {
-      _cfg.pin_cs  = samd51::PORT_B | 21;
-      _cfg.pin_rst = samd51::PORT_C |  7;
-      _rotation = 1;
-    }    
-  };
-
   struct Light_WioTerminal : public ILight
   {
     void init(std::uint8_t brightness) override
@@ -87,20 +77,16 @@ namespace lgfx
     }
   };
 
-  struct LGFX : public LGFX_Device
+  struct Panel_WioTerminal : public Panel_ILI9341
   {
-    LGFX(void) // コンストラクタ内で定義を行う
+    Panel_WioTerminal(void) : Panel_ILI9341()
     {
-      static lgfx::Bus_SPI _bus;
-      static Panel_WioTerminal _panel;
-      static Light_WioTerminal _light;
-
-      _panel.bus(&_bus);   // パネルが使用するバスを指定する
-      panel(&_panel);      // 使用するパネルを指定する
-      light(&_light);      // 使用するバックライトを指定する
+      _cfg.pin_cs  = samd51::PORT_B | 21;
+      _cfg.pin_rst = samd51::PORT_C |  7;
+      _rotation = 1;
 
       {
-        auto cfg = _bus.config(); // バスの設定値を取得
+        auto cfg = _bus_instance.config(); // バスの設定値を取得
         cfg.sercom_index = 7;
         cfg.sercom_clksrc = 0;   // -1=notchange / 0=select GCLK0
         cfg.sercom_clkfreq = F_CPU;
@@ -111,9 +97,28 @@ namespace lgfx
         cfg.pin_dc    = samd51::PORT_C |  6;
         cfg.freq_write = 60000000;
         cfg.freq_read  = 20000000;
-        _bus.config(cfg);   // 設定を反映する
+        _bus_instance.config(cfg);   // 設定を反映する
       }
+
+      bus(&_bus_instance);
+      setLight(&_light_instance);
     }
+
+  private:
+    Light_WioTerminal _light_instance;
+    lgfx::Bus_SPI _bus_instance;
+  };
+
+  struct LGFX : public LGFX_Device
+  {
+    LGFX(void) // コンストラクタ内で定義を行う
+    {
+
+      panel(&_panel_instance);      // 使用するパネルを指定する
+    }
+
+  private:
+    Panel_WioTerminal _panel_instance;
   };
 
 //----------------------------------------------------------------------------

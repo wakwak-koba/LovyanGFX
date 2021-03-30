@@ -48,13 +48,15 @@ namespace lgfx
     bool displayBusy(void) override { return false; }
     void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override {}
 
-    void writePixels(pixelcopy_t* param, std::uint32_t len) override {}
+    void writePixels(pixelcopy_t* param, std::uint32_t len) override;
     void writeBlock(std::uint32_t rawcolor, std::uint32_t len) override;
 
     void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) override;
     void drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor) override;
     void writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor) override;
     void writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool use_dma) override;
+//  void writeImageARGB(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param) override;
+    void copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y) override;
 
     std::uint32_t readCommand(std::uint_fast8_t cmd, std::uint_fast8_t index, std::uint_fast8_t len) override { return 0; }
     std::uint32_t readData(std::uint_fast8_t index, std::uint_fast8_t len) override { return 0; }
@@ -65,6 +67,7 @@ namespace lgfx
     static constexpr std::uint8_t CMD_INVOFF       = 0x20; // 1byte 色反転を解除
     static constexpr std::uint8_t CMD_INVON        = 0x21; // 1byte 色反転を有効
     static constexpr std::uint8_t CMD_BRIGHTNESS   = 0x22; // 2byte バックライト data[1]==明るさ 0~255
+    static constexpr std::uint8_t CMD_COPYRECT     = 0x23; // 13byte 矩形範囲コピー [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~10]==DST_X [11~12]==DST_Y
     static constexpr std::uint8_t CMD_DISPLAY_OFF  = 0x28; // 1byte 画面消灯
     static constexpr std::uint8_t CMD_DISPLAY_ON   = 0x29; // 1byte 画面点灯
     static constexpr std::uint8_t CMD_CASET        = 0x2A; // 5byte X方向の範囲選択 data[1~2]==XS  data[3~4]==XE
@@ -88,7 +91,7 @@ namespace lgfx
 //    static constexpr std::uint8_t CMD_SET_COLOR    = 0x3F; // 3byte 描画色設定 data[1~2]==RGB565色データ
 //    static constexpr std::uint8_t CMD_RAMWR      = 0x40; // 不定長 ピクセルデータ送信
 //    static constexpr std::uint8_t CMD_RAM_RLE    = 0x41; // 不定長 RLEピクセルデータ送信
-//    static constexpr std::uint8_t CMD_COLMOD     = 0x41;
+    static constexpr std::uint8_t CMD_ROTATE       = 0x36;
 
   protected:
   
@@ -98,7 +101,6 @@ namespace lgfx
     std::uint32_t _ypos;
 
     void _set_window(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye);
-    void _update_colmod(void);
   };
 
 //----------------------------------------------------------------------------
