@@ -10,16 +10,18 @@ class M5UnitLCD : public lgfx::LGFX_Device
 
 public:
 
-  M5UnitLCD(void)
+  M5UnitLCD(std::uint8_t pin_sda = 21, std::uint8_t pin_scl = 22, std::uint32_t i2c_freq = 400000, std::uint8_t i2c_port = 0, std::uint8_t i2c_addr = 0x3E)
   {
     {
       auto cfg = _bus_instance.config();
 
-      cfg.freq = 400000;
-      cfg.pin_scl = 22;
-      cfg.pin_sda = 21;
-      cfg.i2c_port = 0;
-      cfg.i2c_addr = 0x3C;
+      cfg.freq = i2c_freq;
+      cfg.freq_read = i2c_freq > 400000 ? 400000 + ((i2c_freq - 400000) >> 1) : i2c_freq;
+      //cfg.freq_read = i2c_freq > 400000 ? 400000 : i2c_freq;
+      cfg.pin_scl = pin_scl;
+      cfg.pin_sda = pin_sda;
+      cfg.i2c_port = i2c_port;
+      cfg.i2c_addr = i2c_addr;
       cfg.prefix_len = 0;
 
       _bus_instance.config(cfg);
@@ -35,7 +37,6 @@ public:
       cfg.panel_height     = 240;
       cfg.offset_x         =   0;
       cfg.offset_rotation  =   0;
-
       _panel_instance.config(cfg);
     }
 

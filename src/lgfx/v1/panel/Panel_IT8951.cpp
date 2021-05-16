@@ -287,11 +287,11 @@ IT8951 Registers defines
   bool Panel_IT8951::_set_area( std::uint32_t x, std::uint32_t y, std::uint32_t w, std::uint32_t h)
   {
     std::uint32_t rx, ry, rw, rh;
-    rx = ((_internal_rotation+1) & 2) ? _width  - w - x : x;
-    ry = ( _internal_rotation    & 2) ? _height - h - y : y;
+    rx = ((_it8951_rotation+1) & 2) ? _width  - w - x : x;
+    ry = ( _it8951_rotation    & 2) ? _height - h - y : y;
     rw = w;
     rh = h;
-    if (_internal_rotation & 1) 
+    if (_it8951_rotation & 1) 
     {
       std::swap(rx, ry);
       std::swap(rw, rh);
@@ -314,7 +314,7 @@ IT8951 Registers defines
     }
 
     std::uint16_t params[5];
-    params[0] = IT8951_LDIMG_B_ENDIAN << 8 | IT8951_4BPP << 4 | _internal_rotation;
+    params[0] = IT8951_LDIMG_B_ENDIAN << 8 | IT8951_4BPP << 4 | _it8951_rotation;
     params[1] = x;
     params[2] = y;
     params[3] = w;
@@ -359,7 +359,7 @@ IT8951 Registers defines
   {
     if (0 < w && 0 < h)
     {
-      if (_internal_rotation & 4)
+      if (_it8951_rotation & 4)
       {
         y = height() - y - h;
       }
@@ -416,11 +416,14 @@ IT8951 Registers defines
   {
     r &= 7;
     _rotation = r;
+//  _it8951_rotation = ((-(r + _cfg.offset_rotation)) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
+    _internal_rotation = ((r + _cfg.offset_rotation) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
     // IT8951の回転方向は左回りなので右回りになるよう変更する。
-    _internal_rotation = ((-(r + _cfg.offset_rotation)) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
+    _it8951_rotation = ((-_internal_rotation) & 3) | (_internal_rotation & 4);
 
-    _width  = (_internal_rotation & 1) ? _cfg.panel_height : _cfg.panel_width;
-    _height = (_internal_rotation & 1) ? _cfg.panel_width : _cfg.panel_height;
+    _width  = _cfg.panel_width;
+    _height = _cfg.panel_height;
+    if (_it8951_rotation & 1) { std::swap(_width, _height); }
   }
 
   void Panel_IT8951::setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye)
@@ -443,7 +446,7 @@ IT8951 Registers defines
 
   void Panel_IT8951::writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor)
   {
-    if (_internal_rotation & 4)
+    if (_it8951_rotation & 4)
     {
       y = height() - y - h;
     }
@@ -489,17 +492,16 @@ IT8951 Registers defines
 
     std::int32_t add_y = 1;
     bool flg_setarea = false;
-    if (_internal_rotation & 4)
+    if (_it8951_rotation & 4)
     {
-      y = height() - y - 1;
+      y = height() - (y + h);
+      param->src_y += h - 1;
       add_y = -1;
     }
     bool fast = _epd_mode == epd_mode_t::epd_fast || _epd_mode == epd_mode_t::epd_fastest;
     auto sx = param->src_x32;
 
-    bool fastdraw = (param->transp == ~0u)
-                 && ( _internal_rotation == 0
-                  || (_internal_rotation == 1 && w == 1));
+    bool fastdraw = (param->transp == ~0u);
     if (fastdraw)
     {
       _set_area(x, y, w, h);
@@ -559,8 +561,8 @@ IT8951 Registers defines
         }
       } while (w != new_pos && w != (prev_pos = param->fp_skip(new_pos, w, param)));
       param->src_x32 = sx;
-      param->src_y++;
-      y += add_y;
+      param->src_y += add_y;
+      ++y;
     } while (--h);
     heap_free(writebuf);
     if (flg_setarea)
@@ -607,7 +609,7 @@ IT8951 Registers defines
     do
     {
       w = std::min(length, xe - xs + 1);
-      auto y = _internal_rotation & 4 ? height() - ypos - 1 : ypos;
+      auto y = _it8951_rotation & 4 ? height() - ypos - 1 : ypos;
       std::int32_t prev_pos = 0, new_pos = 0;
       //do
       {
@@ -679,11 +681,11 @@ IT8951 Registers defines
 /// 画像メモリを直接読み出す場合、ビットシフトや回転方向の解決などは自前で行う必要がある。
 
     std::uint32_t rx, ry, rw, rh;
-    if (_internal_rotation & 4)
+    if (_it8951_rotation & 4)
     {
       y = height() - y - h;
     }
-    switch(_internal_rotation & 3)
+    switch(_it8951_rotation & 3)
     {
     default:
     case IT8951_ROTATE_0:
@@ -731,21 +733,21 @@ IT8951 Registers defines
       }
       param->src_x = 0;
 
-      if (0 == (_internal_rotation & 1))
+      if (0 == (_it8951_rotation & 1))
       {
-        if (_internal_rotation & 2)
+        if (_it8951_rotation & 2)
         {
-          param->src_x32_add = (~0 << pixelcopy_t::FP_SCALE);
+          param->src_x32_add = (~0u << pixelcopy_t::FP_SCALE);
           param->src_x = rw - 1;
         }
-        std::uint32_t dstpos = rw * ((_internal_rotation & 4) ? (rh - j - 1) : j);
+        std::uint32_t dstpos = rw * ((_it8951_rotation & 4) ? (rh - j - 1) : j);
         param->fp_copy(dst, dstpos, dstpos + rw, param);
       }
       else
       {
         for (std::uint32_t i = 0; i < rw; ++i) {
           std::int32_t dstpos;
-          switch (_internal_rotation)
+          switch (_it8951_rotation)
           {
           default:
         //case 0:   dstpos =       i           +       j      * rw; break;

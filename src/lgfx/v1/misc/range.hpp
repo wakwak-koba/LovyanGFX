@@ -27,39 +27,39 @@ namespace lgfx
 
 #pragma pack(push)
 #pragma pack(1)
-  struct range16_t
+  struct range_t
   {
-    std::int16_t first;
-    std::int16_t last;
+    std::int_fast16_t first;
+    std::int_fast16_t last;
 
     std::int_fast16_t length(void) const { return last - first + 1; }
     bool empty(void) const { return last < first; }
-    bool intersectsWith(const range16_t& r) const { return (r.first <= last) && (first <= r.last); }
+    bool intersectsWith(const range_t& r) const { return (r.first <= last) && (first <= r.last); }
     bool intersectsWith(std::int_fast16_t f, std::int_fast16_t l) const { return (f <= last) && (first <= l); }
   };
 
-  struct rect16_t
+  struct range_rect_t
   {
     union
     {
       struct
       {
-        range16_t horizon;
-        range16_t vertical;
+        range_t horizon;
+        range_t vertical;
       };
       struct
       {
-        std::int16_t left;
-        std::int16_t right;
-        std::int16_t top;
-        std::int16_t bottom;
+        std::int_fast16_t left;
+        std::int_fast16_t right;
+        std::int_fast16_t top;
+        std::int_fast16_t bottom;
       };
       struct
       {
-        std::int16_t l;
-        std::int16_t r;
-        std::int16_t t;
-        std::int16_t b;
+        std::int_fast16_t l;
+        std::int_fast16_t r;
+        std::int_fast16_t t;
+        std::int_fast16_t b;
       };
     };
 

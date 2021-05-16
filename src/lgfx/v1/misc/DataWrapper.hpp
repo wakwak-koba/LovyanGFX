@@ -134,7 +134,7 @@ public:
     int read(std::uint8_t *buf, std::uint32_t len) override { return _fp->read(buf, len); }
     void skip(std::int32_t offset) override { _fp->seekCur(offset); }
     bool seek(std::uint32_t offset) override { return _fp->seekSet(offset); }
-    void close() override { _fp->close(); }
+    void close(void) override { if (_fp) _fp->close(); }
     std::int32_t tell(void) override { return _fp->position(); }
   };
 

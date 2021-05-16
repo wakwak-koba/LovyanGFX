@@ -61,13 +61,9 @@ Contributors:
 
 // ArduinoIDEで利用する場合、ボードマネージャで選択したボードに合うConfigが読み込まれます。
 // ESP-IDFやHarmonyで利用する場合は、#include<LovyanGFX.hpp> より前に #define LGFX_ボード名 の記述をしてください。
-// お使いのボードが対応機種にない場合、"config/LGFX_Config_Custom" をコピーしてプロジェクトフォルダに配置し、
-// 動作環境に応じて内容に修正を加えて include して使用してください。
 
 // When using the Arduino IDE, the configuration for the board selected in the Board Manager will be loaded.
 // When using ESP-IDF or Harmony, please specify a #define LGFX_YOUR_BOARD before the #include<LovyanGFX.hpp> .
-// If the board you are using is not supported,  Put a copy of "config/LGFX_Config_Custom" in your project folder,
-// and include it with modifications to the content to suit your environment.
 
 #if defined (ESP32) || defined (CONFIG_IDF_TARGET_ESP32) || defined (ESP_PLATFORM)
 
@@ -76,9 +72,7 @@ Contributors:
   #define LGFX_M5STACK_CORE2
  #elif defined( ARDUINO_M5STACK_Core2 ) // M5Stack Core2
   #define LGFX_M5STACK_CORE2
- #elif defined( ARDUINO_M5Stick_C ) // M5Stick C / CPlus
-  #define LGFX_M5STICK_C
- #elif defined( ARDUINO_M5Stick_C_Plus )
+ #elif defined( ARDUINO_M5Stick_C ) || defined( ARDUINO_M5Stick_C_Plus ) // M5Stick C / CPlus
   #define LGFX_M5STICK_C
  #elif defined( ARDUINO_M5Stack_CoreInk ) // M5Stack CoreInk
   #define LGFX_M5STACK_COREINK

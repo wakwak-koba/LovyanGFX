@@ -21,8 +21,9 @@ Contributors:
 #include "../utility/lgfx_pngle.h"
 #include "../utility/lgfx_qrcode.h"
 #include "../utility/lgfx_tjpgd.h"
+#include "panel/Panel_Device.hpp"
 #include "misc/bitmap.hpp"
-#include "lgfx_TTFfont.hpp"
+//#include "lgfx_TTFfont.hpp"
 
 #include <cstdarg>
 #include <cmath>
@@ -52,7 +53,7 @@ namespace lgfx
 
   void LGFXBase::setRotation(std::uint_fast8_t rotation)
   {
-    _panel->setRotation(rotation);
+    if (_panel) _panel->setRotation(rotation);
     clearClipRect();
   }
 
@@ -197,21 +198,11 @@ namespace lgfx
 
   void LGFXBase::writeFillRect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h)
   {
-    auto cl = _clip_l;
-    if (x < cl) { w += x - cl; x = cl; }
-    auto cr = _clip_r + 1 - x;
-    if (w > cr) w = cr;
-    if (w < 1) return;
-
-    auto ct = _clip_t;
-    if (y < ct) { h += y - ct; y = ct; }
-    auto cb = _clip_b + 1 - y;
-    if (h > cb) h = cb;
-    if (h < 1) return;
-
-    writeFillRectPreclipped(x, y, w, h);
+    if (_clipping(x, y, w, h))
+    {
+      writeFillRectPreclipped(x, y, w, h);
+    }
   }
-
 
   void LGFXBase::drawRect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h)
   {
@@ -515,52 +506,75 @@ namespace lgfx
   {
     bool steep = abs(y1 - y0) > abs(x1 - x0);
 
-    if (steep) {   std::swap(x0, y0); std::swap(x1, y1); }
-    if (x0 > x1) { std::swap(x0, x1); std::swap(y0, y1); }
+    std::int32_t xstart = _clip_l;
+    std::int32_t ystart = _clip_t;
+    std::int32_t xend   = _clip_r;
+    std::int32_t yend   = _clip_b;
+
+    if (steep)
+    {
+      std::swap(xstart, ystart);
+      std::swap(xend, yend);
+      std::swap(x0, y0);
+      std::swap(x1, y1);
+    }
+    if (x0 > x1)
+    {
+      std::swap(x0, x1);
+      std::swap(y0, y1);
+    }
+    if (x0 > xend || x1 < xstart) return;
+    xend = std::min(x1, xend);
 
     std::int32_t dy = abs(y1 - y0);
     std::int32_t ystep = (y1 > y0) ? 1 : -1;
     std::int32_t dx = x1 - x0;
     std::int32_t err = dx >> 1;
 
-    std::int32_t xstart = steep ? _clip_t : _clip_l;
-    std::int32_t ystart = steep ? _clip_l : _clip_t;
-    std::int32_t yend   = steep ? _clip_r : _clip_b;
-    while (x0 < xstart || y0 < ystart || y0 > yend) {
+    while (x0 < xstart || y0 < ystart || y0 > yend)
+    {
       err -= dy;
-      if (err < 0) {
+      if (err < 0)
+      {
         err += dx;
         y0 += ystep;
       }
-      if (++x0 > x1) return;
+      if (++x0 > xend) return;
     }
     std::int32_t xs = x0;
     std::int32_t dlen = 0;
+    if (ystep < 0) std::swap(ystart, yend);
+    yend += ystep;
 
     startWrite();
-    if (steep) {
-      if (x1 > (_clip_b)) x1 = (_clip_b);
-      do {
+    if (steep)
+    {
+      do
+      {
         ++dlen;
-        if ((err -= dy) < 0) {
+        if ((err -= dy) < 0)
+        {
           writeFillRectPreclipped(y0, xs, 1, dlen);
           err += dx;
           xs = x0 + 1; dlen = 0; y0 += ystep;
-          if ((y0 < _clip_l) || (y0 > _clip_r)) break;
+          if (y0 == yend) break;
         }
-      } while (++x0 <= x1);
+      } while (++x0 <= xend);
       if (dlen) writeFillRectPreclipped(y0, xs, 1, dlen);
-    } else {
-      if (x1 > (_clip_r)) x1 = (_clip_r);
-      do {
+    }
+    else
+    {
+      do
+      {
         ++dlen;
-        if ((err -= dy) < 0) {
+        if ((err -= dy) < 0)
+        {
           writeFillRectPreclipped(xs, y0, dlen, 1);
           err += dx;
           xs = x0 + 1; dlen = 0; y0 += ystep;
-          if ((y0 < _clip_t) || (y0 > _clip_b)) break;
+          if (y0 == yend) break;
         }
-      } while (++x0 <= x1);
+      } while (++x0 <= xend);
       if (dlen) writeFillRectPreclipped(xs, y0, dlen, 1);
     }
     endWrite();
@@ -854,11 +868,12 @@ namespace lgfx
     endWrite();
   }
 
-  void LGFXBase::drawArc(std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float start, float end)
+  void LGFXBase::drawEllipseArc(std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float start, float end)
   {
-    if (r0 < r1) std::swap(r0, r1);
-    if (r0 < 1) r0 = 1;
-    if (r1 < 1) r1 = 1;
+    if (r0x < r1x) std::swap(r0x, r1x);
+    if (r0y < r1y) std::swap(r0y, r1y);
+    if (r1x < 0) return;
+    if (r1y < 0) return;
 
     bool equal = fabsf(start - end) < std::numeric_limits<float>::epsilon();
     start = fmodf(start, 360);
@@ -867,19 +882,20 @@ namespace lgfx
     if (end < 0) end += 360.0;
 
     startWrite();
-    fill_arc_helper(x, y, r0, r1, start, start);
-    fill_arc_helper(x, y, r0, r1, end  , end);
+    fill_arc_helper(x, y, r0x, r1x, r0y, r1y, start, start);
+    fill_arc_helper(x, y, r0x, r1x, r0y, r1y, end, end);
     if (!equal && (fabsf(start - end) <= 0.0001)) { start = .0; end = 360.0; }
-    fill_arc_helper(x, y, r0, r0, start, end);
-    fill_arc_helper(x, y, r1, r1, start, end);
+    fill_arc_helper(x, y, r0x, r0x, r0y, r0y, start, end);
+    fill_arc_helper(x, y, r1x, r1x, r1y, r1y, start, end);
     endWrite();
   }
 
-  void LGFXBase::fillArc(std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float start, float end)
+  void LGFXBase::fillEllipseArc(std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float start, float end)
   {
-    if (r0 < r1) std::swap(r0, r1);
-    if (r0 < 1) r0 = 1;
-    if (r1 < 1) r1 = 1;
+    if (r0x < r1x) std::swap(r0x, r1x);
+    if (r0y < r1y) std::swap(r0y, r1y);
+    if (r1x < 0) return;
+    if (r1y < 0) return;
 
     bool equal = fabsf(start - end) < std::numeric_limits<float>::epsilon();
     start = fmodf(start, 360);
@@ -889,11 +905,11 @@ namespace lgfx
     if (!equal && (fabsf(start - end) <= 0.0001)) { start = .0; end = 360.0; }
 
     startWrite();
-    fill_arc_helper(x, y, r0, r1, start, end);
+    fill_arc_helper(x, y, r0x, r1x, r0y, r1y, start, end);
     endWrite();
   }
 
-  void LGFXBase::fill_arc_helper(std::int32_t cx, std::int32_t cy, std::int32_t oradius, std::int32_t iradius, float start, float end)
+  void LGFXBase::fill_arc_helper(std::int32_t cx, std::int32_t cy, std::int32_t oradius_x, std::int32_t iradius_x, std::int32_t oradius_y, std::int32_t iradius_y, float start, float end)
   {
     float s_cos = (cosf(start * deg_to_rad));
     float e_cos = (cosf(end * deg_to_rad));
@@ -902,51 +918,77 @@ namespace lgfx
     if (end != 360.0) eslope = e_cos / (sinf(end * deg_to_rad));
     float swidth =  0.5 / s_cos;
     float ewidth = -0.5 / e_cos;
-    --iradius;
-    int ir2 = iradius * iradius + iradius;
-    int or2 = oradius * oradius + oradius;
 
     bool start180 = !(start < 180);
     bool end180 = end < 180;
     bool reversed = start + 180 < end || (end < start && start < end + 180);
 
-    int xs = -oradius;
-    int y = -oradius;
-    int ye = oradius;
-    int xe = oradius + 1;
-    if (!reversed) {
-      if (   (end >= 270 || end < 90) && (start >= 270 || start < 90)) xs = 0;
-      else if (end < 270 && end >= 90 && start < 270 && start >= 90) xe = 1;
+    std::int32_t xleft  = -oradius_x;
+    std::int32_t xright = oradius_x + 1;
+    std::int32_t y = -oradius_y;
+    std::int32_t ye = oradius_y;
+    if (!reversed)
+    {
+      if (    (end >= 270 || end <  90) && (start >= 270 || start <  90)) xleft = 0;
+      else if (end <  270 && end >= 90  &&  start <  270 && start >= 90) xright = 1;
       if (     end >= 180 && start >= 180) ye = 0;
-      else if (end < 180 && start < 180) y = 0;
+      else if (end <  180 && start <  180) y = 0;
     }
-    do {
-      int y2 = y * y;
-      int x = xs;
-      if (x < 0) {
-        while (x * x + y2 >= or2) ++x;
-        if (xe != 1) xe = 1 - x;
+    if (y  < _clip_t - cy    ) y  = _clip_t - cy;
+    if (ye > _clip_b - cy + 1) ye = _clip_b - cy + 1;
+
+    if (xleft  < _clip_l - cx    ) xleft  = _clip_l - cx;
+    if (xright > _clip_r - cx + 1) xright = _clip_r - cx + 1;
+
+    bool trueCircle = (oradius_x == oradius_y) && (iradius_x == iradius_y);
+
+    std::int32_t iradius_y2 = iradius_y * (iradius_y - 1);
+    std::int32_t iradius_x2 = iradius_x * (iradius_x - 1);
+    float irad_rate = iradius_x2 && iradius_y2 ? (float)iradius_x2 / (float)iradius_y2 : 0;
+
+    std::int32_t oradius_y2 = oradius_y * (oradius_y + 1);
+    std::int32_t oradius_x2 = oradius_x * (oradius_x + 1);
+    float orad_rate = oradius_x2 && oradius_y2 ? (float)oradius_x2 / (float)oradius_y2 : 0;
+
+    do
+    {
+      std::int32_t y2 = y * y;
+      std::int32_t compare_o = oradius_y2 - y2;
+      std::int32_t compare_i = iradius_y2 - y2;
+      if (!trueCircle)
+      {
+        compare_i = floorf(compare_i * irad_rate);
+        compare_o = ceilf (compare_o * orad_rate);
       }
+      std::int32_t xe = ceilf(sqrtf(compare_o));
+      std::int32_t x = 1 - xe;
+
+      if ( x < xleft )  x = xleft;
+      if (xe > xright) xe = xright;
       float ysslope = (y + swidth) * sslope;
       float yeslope = (y + ewidth) * eslope;
       int len = 0;
-      do {
+      do
+      {
         bool flg1 = start180 != (x <= ysslope);
         bool flg2 =   end180 != (x <= yeslope);
-        int distance = x * x + y2;
-        if (distance >= ir2
+        std::int32_t x2 = x * x;
+        if (x2 >= compare_i
          && ((flg1 && flg2) || (reversed && (flg1 || flg2)))
          && x != xe
-         && distance < or2
-          ) {
+         && x2 < compare_o)
+        {
           ++len;
-        } else {
-          if (len) {
+        }
+        else
+        {
+          if (len)
+          {
             writeFastHLine(cx + x - len, cy + y, len);
             len = 0;
           }
-          if (distance >= or2) break;
-          if (x < 0 && distance < ir2) { x = -x; }
+          if (x2 >= compare_o) break;
+          if (x < 0 && x2 < compare_i) { x = -x; }
         }
       } while (++x <= xe);
     } while (++y <= ye);
@@ -1029,7 +1071,6 @@ namespace lgfx
 
     if (_adjust_width(x, dx, dw, _clip_l, _clip_r - _clip_l + 1)) return;
     param->src_x = dx;
-
 
     std::int32_t dy=0, dh=h;
     if (0 < _clip_t - y) { dy = _clip_t - y; dh -= dy; y = _clip_t; }
@@ -1151,7 +1192,7 @@ namespace lgfx
     {
       std::int32_t offset_y32 = matrix[5] * (1 << FP_SCALE) + (1 << (FP_SCALE-1));
       min_y = std::max(_clip_t    , (offset_y32 + min_y - 1) >> FP_SCALE);
-      max_y = std::min(_clip_b + 1, (offset_y32 + max_y    ) >> FP_SCALE);
+      max_y = std::min(_clip_b + 1, (offset_y32 + max_y + 1) >> FP_SCALE);
       if (min_y >= max_y) return;
     }
 
@@ -1210,7 +1251,7 @@ namespace lgfx
     {
       std::int32_t offset_y32 = matrix[5] * (1 << FP_SCALE) + (1 << (FP_SCALE-1));
       min_y = std::max(_clip_t    , (offset_y32 + min_y - 1) >> FP_SCALE);
-      max_y = std::min(_clip_b + 1, (offset_y32 + max_y    ) >> FP_SCALE);
+      max_y = std::min(_clip_b + 1, (offset_y32 + max_y + 1) >> FP_SCALE);
       if (min_y >= max_y) return;
     }
 
@@ -1325,8 +1366,10 @@ namespace lgfx
         pc->src_ye32 = ys + y32_diff;
 
         pc->fp_copy(buffer, 0, len, pc);
-        pc2->src_x = 0;
-        pc2->src_y = 0;
+        pc2->src_x32_add = 1 << pixelcopy_t::FP_SCALE;
+        pc2->src_y32_add = 0;
+        pc2->src_x32 = 0;
+        pc2->src_y32 = 0;
         _panel->writeImageARGB(left, min_y, len, 1, pc2);
       }
     } while (++min_y != max_y);
@@ -1937,6 +1980,8 @@ namespace lgfx
 
   void LGFXBase::setFont(const IFont* font)
   {
+    if (_font == font) return;
+
     _runtime_font.reset();
     if (font == nullptr) font = &fonts::Font0;
     _font = font;
@@ -1980,7 +2025,6 @@ namespace lgfx
     else
 #endif
     {
-return false;
       this->_runtime_font.reset(new VLWfont());
     }
 
@@ -2111,30 +2155,36 @@ return false;
     std::int32_t w = bmpdata.biWidth;
     std::int32_t h = abs(bmpdata.biHeight);  // bcHeight Image height (pixels)
 
-    auto clip_x = x;
-    auto clip_y = y;
     const auto cl = this->_clip_l;
     const auto cr = this->_clip_r + 1;
-    if (!maxWidth) maxWidth = cr - cl;
-
     const auto ct = this->_clip_t;
     const auto cb = this->_clip_b + 1;
-    if (!maxHeight) maxHeight = cb - ct;
-    if (scale_x <= -1.0f) { scale_x = (float)maxWidth  / w; }
-    if (scale_y <= -1.0f) { scale_y = (float)maxHeight / h; }
 
-    if (scale_x <= 0.0f)
+    if (scale_y <= 0.0f || scale_x <= 0.0f)
     {
+      float fit_width  = (maxWidth  > 0) ? maxWidth  : cr - cl;
+      float fit_height = (maxHeight > 0) ? maxHeight : cb - ct;
+
+      if (scale_x <= -1.0f) { scale_x = fit_width  / w; }
+      if (scale_y <= -1.0f) { scale_y = fit_height / h; }
+      if (scale_x <= 0.0f)
+      {
+        if (scale_y <= 0.0f)
+        {
+          scale_y = std::min<float>(fit_width / w, fit_height / h);
+        }
+        scale_x = scale_y;
+      }
       if (scale_y <= 0.0f)
       {
-        scale_y = std::min<float>((float)maxWidth / w, (float)maxHeight / h);
+        scale_y = scale_x;
       }
-      scale_x = scale_y;
     }
-    if (scale_y <= 0.0f)
-    {
-      scale_y = scale_x;
-    }
+    if (maxWidth  <= 0) maxWidth  = INT16_MAX;
+    if (maxHeight <= 0) maxHeight = INT16_MAX;
+
+    auto clip_x = x;
+    auto clip_y = y;
 
     if (datum)
     {
@@ -2338,27 +2388,31 @@ return false;
 
     const auto cl = this->_clip_l;
     const auto cr = this->_clip_r + 1;
-    if (!maxWidth) maxWidth = cr - cl;
-
     const auto ct = this->_clip_t;
     const auto cb = this->_clip_b + 1;
-    if (!maxHeight) maxHeight = cb - ct;
 
-    if (scale_x <= -1.0f) { scale_x = (float)maxWidth  / jpegdec.width;  }
-    if (scale_y <= -1.0f) { scale_y = (float)maxHeight / jpegdec.height; }
-
-    if (scale_x <= 0.0f)
+    if (scale_y <= 0.0f || scale_x <= 0.0f)
     {
+      float fit_width  = (maxWidth  > 0) ? maxWidth  : cr - cl;
+      float fit_height = (maxHeight > 0) ? maxHeight : cb - ct;
+
+      if (scale_x <= -1.0f) { scale_x = fit_width  / jpegdec.width; }
+      if (scale_y <= -1.0f) { scale_y = fit_height / jpegdec.height; }
+      if (scale_x <= 0.0f)
+      {
+        if (scale_y <= 0.0f)
+        {
+          scale_y = std::min<float>(fit_width / jpegdec.width, fit_height / jpegdec.height);
+        }
+        scale_x = scale_y;
+      }
       if (scale_y <= 0.0f)
       {
-        scale_y = std::min<float>((float)maxWidth / jpegdec.width, (float)maxHeight / jpegdec.height);
+        scale_y = scale_x;
       }
-      scale_x = scale_y;
     }
-    if (scale_y <= 0.0f)
-    {
-      scale_y = scale_x;
-    }
+    if (maxWidth  <= 0) maxWidth  = INT16_MAX;
+    if (maxHeight <= 0) maxHeight = INT16_MAX;
 
     if (datum)
     {
@@ -2579,21 +2633,31 @@ return false;
     auto p = (png_file_decoder_t*)lgfx_pngle_get_user_data(pngle);
     auto me = p->gfx;
 
-    if (p->zoom_x <= -1.0f) { p->zoom_x = (float)p->maxWidth  / w; }
-    if (p->zoom_y <= -1.0f) { p->zoom_y = (float)p->maxHeight / h; }
+    std::int32_t cw, ch, cl, ct;
+    me->getClipRect(&cl, &ct, &cw, &ch);
 
-    if (p->zoom_x <= 0.0f)
+    if (p->zoom_y <= 0.0f || p->zoom_x <= 0.0f)
     {
+      float fit_width  = (p->maxWidth  > 0) ? p->maxWidth  : cw;
+      float fit_height = (p->maxHeight > 0) ? p->maxHeight : ch;
+
+      if (p->zoom_x <= -1.0f) { p->zoom_x = fit_width  / w; }
+      if (p->zoom_y <= -1.0f) { p->zoom_y = fit_height / h; }
+      if (p->zoom_x <= 0.0f)
+      {
+        if (p->zoom_y <= 0.0f)
+        {
+          p->zoom_y = std::min<float>(fit_width / w, fit_height / h);
+        }
+        p->zoom_x = p->zoom_y;
+      }
       if (p->zoom_y <= 0.0f)
       {
-        p->zoom_y = std::min<float>((float)p->maxWidth / w, (float)p->maxHeight / h);
+        p->zoom_y = p->zoom_x;
       }
-      p->zoom_x = p->zoom_y;
     }
-    if (p->zoom_y <= 0.0f)
-    {
-      p->zoom_y = p->zoom_x;
-    }
+    if (p->maxWidth  <= 0) p->maxWidth  = INT16_MAX;
+    if (p->maxHeight <= 0) p->maxHeight = INT16_MAX;
 
     w = ceilf(w * p->zoom_x);
     h = ceilf(h * p->zoom_y);
@@ -2613,10 +2677,9 @@ return false;
         p->offY -= fh;
       }
     }
-    std::int32_t cl, ct, cr, cb;
-    me->getClipRect(&cl, &ct, &cr, &cb);
-    cr += cl;
-    cb += ct;
+
+    const std::int32_t cr = cw + cl;
+    const std::int32_t cb = ch + ct;
 
     if (0 > p->x - cl) { p->maxWidth += p->x - cl; p->offX -= p->x - cl; p->x = cl; }
     if (0 > p->offX) { p->x -= p->offX; p->maxWidth  += p->offX; p->offX = 0; }
@@ -2671,8 +2734,8 @@ return false;
     png.y = y;
     png.offX = offX;
     png.offY = offY;
-    png.maxWidth  = maxWidth > 0 ? maxWidth : (_clip_r - _clip_l + 1);
-    png.maxHeight = maxHeight> 0 ? maxHeight: (_clip_b - _clip_t + 1);
+    png.maxWidth  = maxWidth ;
+    png.maxHeight = maxHeight;
     png.zoom_x = scale_x;
     png.zoom_y = scale_y;
     png.datum = datum;
@@ -2773,6 +2836,11 @@ return false;
   {
   }
 
+  void LGFX_Device::initBus(void)
+  {
+    panel()->initBus();
+  };
+
   void LGFX_Device::init_impl(bool use_reset, bool use_clear)
   {
     if (_panel)
@@ -2787,48 +2855,84 @@ return false;
       invertDisplay(_panel->getInvert());
       setColorDepth(_panel->getWriteDepth());
       setRotation(  _panel->getRotation());
-      setPivot(width()>>1, height()>>1);
       if (use_clear)
       {
         clear();
       }
-      setBrightness(_brightness);
+      setPivot(width()>>1, height()>>1);
       endWrite();
+      setBrightness(_brightness);
+    }
+  }
+
+//----------------------------------------------------------------------------
+
+    void LGFX_Device::draw_calibrate_point(std::int32_t x, std::int32_t y, std::int32_t r, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor)
+    {
+      setRawColor(bg_rawcolor);
+      fillRect(x - r, y - r, r * 2 + 1, r * 2 + 1);
+      if (fg_rawcolor == bg_rawcolor) return;
+      setClipRect(x - r, y - r, r * 2 + 1, r * 2 + 1);
+      setRawColor(fg_rawcolor);
+      startWrite();
+      auto w = std::max<std::int32_t>(1, r >> 3);
+      fillRect(x - w, y - r, w * 2 + 1, r * 2 + 1);
+      fillRect(x - r, y - w, r * 2 + 1, w * 2 + 1);
+      for (std::int32_t i = - r; i <= r; ++i) {
+        drawFastHLine(x + i - w, y + i, w * 2 + 1);
+        drawFastHLine(x - i - w, y + i, w * 2 + 1);
+      }
+      display();
+      endWrite();
+      clearClipRect();
     }
 
-    if (_touch) _touch->init();
-  }
-/*
-  std::uint_fast8_t LGFX_Device::getTouchRaw(touch_point_t *tp, std::uint_fast8_t number)
-  {
-    if (_touch == nullptr) return 0;
+    void LGFX_Device::calibrate_touch(std::uint16_t *parameters, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor, std::uint8_t size)
+    {
+      if (nullptr == touch()) return;
+      auto rot = getRotation();
 
-    bool need_transaction = (_touch->config().bus_shared && getStartCount());
-    if (need_transaction) { endTransaction(); }
-    auto res = _touch->getTouchRaw(tp, number);
-    if (need_transaction) { beginTransaction(); }
-    return res;
-  }
+      std::uint_fast8_t panel_offsetrot = panel()->config().offset_rotation;
+      std::uint_fast8_t touch_offsetrot = touch()->config().offset_rotation;
 
-  std::uint_fast8_t LGFX_Device::getTouch(touch_point_t *tp, std::uint_fast8_t number)
-  {
-    if (_touch == nullptr) return 0;
+      // 回転オフセットをキャンセルしてタッチデバイスのデフォルトの向きに合わせる
+      setRotation(( (touch_offsetrot ^ panel_offsetrot) & 4)
+                 |(-(touch_offsetrot + panel_offsetrot) & 3));
 
-    bool need_transaction = (_touch->config().bus_shared && getStartCount());
-    if (need_transaction) { endTransaction(); }
-    auto res = _touch->getTouch(tp, number);
-    if (need_transaction) { beginTransaction(); }
+      std::uint16_t orig[8];
+      for (int i = 0; i < 4; ++i) {
+        std::int32_t px = (width() -  1) * ((i>>1) & 1);
+        std::int32_t py = (height() - 1) * ( i     & 1);
+        draw_calibrate_point( px, py, size, fg_rawcolor, bg_rawcolor);
+        delay(512);
+        std::int32_t x_touch = 0, y_touch = 0;
+        static constexpr int _RAWERR = 20;
+        std::int32_t x_tmp, y_tmp, x_tmp2, y_tmp2;
+        for (int j = 0; j < 8; ++j) {
+          do {
+            do { delay(1); } while (!getTouchRaw(&x_tmp,&y_tmp));
+            delay(2); // Small delay to the next sample
+          } while (!getTouchRaw(&x_tmp2,&y_tmp2)
+                 || (abs(x_tmp - x_tmp2) > _RAWERR)
+                 || (abs(y_tmp - y_tmp2) > _RAWERR));
 
-    std::uint_fast8_t r = getRotation();
-    if (r & 1) {
-      std::swap(tp->x, tp->y);
+          x_touch += x_tmp;
+          x_touch += x_tmp2;
+          y_touch += y_tmp;
+          y_touch += y_tmp2;
+        }
+        orig[i*2  ] = x_touch >> 4;
+        orig[i*2+1] = y_touch >> 4;
+        draw_calibrate_point( px, py, size, bg_rawcolor, bg_rawcolor);
+        while (getTouchRaw());
+      }
+      if (nullptr != parameters) {
+        memcpy(parameters, orig, sizeof(std::uint16_t) * 8);
+      }
+      panel()->setCalibrate(orig);
+      setRotation(rot);
     }
-    if (r & 2) tp->x = (_width-1) - tp->x;
-    if ((0 == ((r + 1) & 2)) != (0 == (r & 4))) tp->y = (_height-1) - tp->y;
 
-    return res;
-  }
-//*/
 //----------------------------------------------------------------------------
  }
 }

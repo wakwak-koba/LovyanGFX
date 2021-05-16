@@ -170,8 +170,8 @@ namespace lgfx
     void init(std::uint8_t brightness) override
     {
       using namespace m5stack;
-      lgfx::i2c::init(axp_i2c_port, axp_i2c_sda, axp_i2c_scl, axp_i2c_freq);
-      lgfx::i2c::writeRegister8(axp_i2c_port, axp_i2c_addr, 0x12, 0x4D, ~0);
+      lgfx::i2c::init(axp_i2c_port, axp_i2c_sda, axp_i2c_scl);
+      lgfx::i2c::writeRegister8(axp_i2c_port, axp_i2c_addr, 0x12, 0x4D, ~0, axp_i2c_freq);
       setBrightness(brightness);
     }
 
@@ -181,13 +181,13 @@ namespace lgfx
       if (brightness)
       {
         brightness = (((brightness >> 1) + 8) / 13) + 5;
-        lgfx::i2c::bitOn(axp_i2c_port, axp_i2c_addr, 0x12, 1 << 2);
+        lgfx::i2c::bitOn(axp_i2c_port, axp_i2c_addr, 0x12, 1 << 2, axp_i2c_freq);
       }
       else
       {
-        lgfx::i2c::bitOff(axp_i2c_port, axp_i2c_addr, 0x12, 1 << 2);
+        lgfx::i2c::bitOff(axp_i2c_port, axp_i2c_addr, 0x12, 1 << 2, axp_i2c_freq);
       }
-      lgfx::i2c::writeRegister8(axp_i2c_port, axp_i2c_addr, 0x28, brightness << 4, 0x0F);
+      lgfx::i2c::writeRegister8(axp_i2c_port, axp_i2c_addr, 0x28, brightness << 4, 0x0F, axp_i2c_freq);
     }
   };
 
@@ -275,30 +275,82 @@ namespace lgfx
 
     void init_impl(bool use_reset, bool use_clear)
     {
-      int retry = 3;
-      while (!autodetect(use_reset) && --retry);
-      if (retry == 0)
+      static constexpr char NVS_KEY[] = "AUTODETECT";
+      std::uint32_t nvs_board = 0;
+      std::uint32_t nvs_handle = 0;
+      if (0 == nvs_open(LIBRARY_NAME, NVS_READONLY, &nvs_handle))
       {
-        retry = 3;
-        while (!autodetect(true) && --retry);
+        nvs_get_u32(nvs_handle, NVS_KEY, static_cast<uint32_t*>(&nvs_board));
+        nvs_close(nvs_handle);
+        ESP_LOGW(LIBRARY_NAME, "[Autodetect] load from NVS : board:%d", nvs_board);
       }
+
+      if (0 == nvs_board)
+      {
+#if defined ( ARDUINO_M5Stack_Core_ESP32 ) || defined ( ARDUINO_M5STACK_FIRE )
+
+        nvs_board = board_t::board_M5Stack;
+
+#elif defined ( ARDUINO_M5STACK_Core2 )
+
+        nvs_board = board_t::board_M5StackCore2;
+
+#elif defined ( ARDUINO_M5Stick_C )
+
+        nvs_board = board_t::board_M5StickC;
+
+#elif defined ( ARDUINO_M5Stick_C_Plus )
+
+        nvs_board = board_t::board_M5StickCPlus;
+
+#elif defined ( ARDUINO_M5Stack_CoreInk )
+
+        nvs_board = board_t::board_M5StackCoreInk;
+
+#elif defined ( ARDUINO_M5STACK_Paper )
+
+        nvs_board = board_t::board_M5Paper;
+
+#elif defined ( ARDUINO_M5Stack_ATOM )
+#elif defined ( ARDUINO_M5STACK_TOUGH )
+#elif defined ( ARDUINO_M5Stack-Timer-CAM )
+#endif
+
+      }
+
+      _board = (board_t)nvs_board;
+
+      int retry = 4;
+      do
+      {
+        if (retry == 1) use_reset = true;
+        _board = autodetect(use_reset, _board);
+  ESP_LOGI("DEBUG","return _board:%d", _board);
+      } while (board_t::board_unknown == _board && --retry >= 0);
 
       /// autodetectの際にreset済みなのでここではuse_resetをfalseで呼び出す。
       /// M5Paperはreset後の復帰に800msec程度掛かるのでreset省略は起動時間短縮に有効
       LGFX_Device::init_impl(false, use_clear);
+
+      if (nvs_board != _board) {
+        if (0 == nvs_open(LIBRARY_NAME, NVS_READWRITE, &nvs_handle)) {
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] save to NVS : board:%d", _board);
+          nvs_set_u32(nvs_handle, NVS_KEY, _board);
+          nvs_close(nvs_handle);
+        }
+      }
     }
 
   public:
 
     lgfx::board_t getBoard(void) const { return _board; }
 
-    bool autodetect(bool use_reset = true)
+    board_t autodetect(bool use_reset = true, board_t board = board_t::board_unknown)
     {
       auto bus_cfg = _bus_spi.config();
-      if (bus_cfg.pin_mosi != -1 && bus_cfg.pin_sclk != -1) return true;
+//    if (bus_cfg.pin_mosi != -1 && bus_cfg.pin_sclk != -1) return true;
 
       panel(nullptr);
-      touch(nullptr);
 
       if (_panel_last)
       {
@@ -326,19 +378,9 @@ namespace lgfx
       std::uint32_t id;
       (void)id;  // suppress warning
 
-      static constexpr char NVS_KEY[] = "AUTODETECT";
-      std::uint32_t nvs_board = 0;
-      std::uint32_t nvs_handle = 0;
-      if (0 == nvs_open(LIBRARY_NAME, NVS_READONLY, &nvs_handle))
-      {
-        nvs_get_u32(nvs_handle, NVS_KEY, static_cast<uint32_t*>(&nvs_board));
-        nvs_close(nvs_handle);
-        ESP_LOGW(LIBRARY_NAME, "[Autodetect] load from NVS : board:%d", nvs_board);
-      }
-
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STACK ) || defined ( LGFX_LOLIN_D32_PRO )
 
-      if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5Stack || nvs_board == lgfx::board_t::board_LoLinD32)
+      if (board == 0 || board == lgfx::board_t::board_M5Stack || board == lgfx::board_t::board_LoLinD32)
       {
         _pin_level(14, true);     // LCD CS;
         bus_cfg.pin_mosi = 23;
@@ -355,7 +397,7 @@ namespace lgfx
         #endif
 
         #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STACK )
-        if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5Stack)
+        if (board == 0 || board == lgfx::board_t::board_M5Stack)
         {
           bus_cfg.spi_3wire = true;
           _bus_spi.config(bus_cfg);
@@ -388,7 +430,7 @@ namespace lgfx
         #endif
 
         #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_LOLIN_D32_PRO )
-        if (nvs_board == 0 || nvs_board == lgfx::board_t::board_LoLinD32)
+        if (board == 0 || board == lgfx::board_t::board_LoLinD32)
         {
           bus_cfg.spi_3wire = false;
           _bus_spi.config(bus_cfg);
@@ -433,7 +475,7 @@ namespace lgfx
           }
           _bus_spi.release();
         }
-        lgfx::pinMode( 5, pin_mode_t::input); // LoLinD32 TF card CS
+        lgfx::pinMode( 5, pin_mode_t::input_pullup); // LoLinD32 TF card CS
         lgfx::pinMode(12, pin_mode_t::input); // LoLinD32 TouchScreen CS
         #endif
 
@@ -444,7 +486,8 @@ namespace lgfx
 
 // M5StickC / CPlus 判定
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STICK_C ) || defined ( LGFX_M5STICKC )
-      if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5StickC || nvs_board == lgfx::board_t::board_M5StickCPlus)
+
+      if (board == 0 || board == lgfx::board_t::board_M5StickC || board == lgfx::board_t::board_M5StickCPlus)
       {
         bus_cfg.pin_mosi = 15;
         bus_cfg.pin_miso = 14;
@@ -492,7 +535,8 @@ namespace lgfx
 
 // M5Stack CoreInk 判定
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STACK_COREINK )
-      if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5Stack_CoreInk)
+
+      if (board == 0 || board == lgfx::board_t::board_M5Stack_CoreInk)
       {
         bus_cfg.pin_mosi = 23;
         bus_cfg.pin_miso = -1;
@@ -531,7 +575,8 @@ namespace lgfx
 
 // M5Stack Paper 判定
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5PAPER )
-      if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5Paper)
+
+      if (board == 0 || board == lgfx::board_t::board_M5Paper)
       {
         _pin_reset(23, true);
         lgfx::pinMode(27, lgfx::pin_mode_t::input_pullup); // M5Paper EPD busy pin
@@ -605,8 +650,6 @@ namespace lgfx
               }
               {
                 auto t = new lgfx::Touch_GT911();
-                _touch_last = t;
-                touch(t);
                 auto cfg = t->config();
                 cfg.pin_int  = 36;   // INT pin number
                 cfg.pin_sda  = 21;   // I2C SDA pin number
@@ -615,15 +658,17 @@ namespace lgfx
                 cfg.i2c_port = I2C_NUM_0;// I2C port number
                 cfg.freq = 400000;   // I2C freq
                 cfg.x_min = 0;
-                cfg.x_max = 959;
+                cfg.x_max = 539;
                 cfg.y_min = 0;
-                cfg.y_max = 539;
+                cfg.y_max = 959;
+                cfg.offset_rotation = 1;
                 t->config(cfg);
                 if (!t->init())
                 {
                   cfg.i2c_addr = 0x5D; // addr change (0x14 or 0x5D)
                   t->config(cfg);
                 }
+                _panel_last->touch(t);
               }
 
               goto init_clear;
@@ -643,21 +688,23 @@ namespace lgfx
 // M5Stack Core2 判定
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_M5STACK_CORE2 ) || defined ( LGFX_M5STACKCORE2 )
 
-      if (nvs_board == 0 || nvs_board == lgfx::board_t::board_M5StackCore2)
+      if (board == 0 || board == lgfx::board_t::board_M5StackCore2)
       {
         using namespace m5stack;
 
-        lgfx::i2c::init(m5stack::axp_i2c_port, m5stack::axp_i2c_sda, m5stack::axp_i2c_scl, m5stack::axp_i2c_freq);
+        lgfx::i2c::init(m5stack::axp_i2c_port, m5stack::axp_i2c_sda, m5stack::axp_i2c_scl);
         // I2C addr 0x34 = AXP192
-        if (lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x95, 0x84, 0x72))
+        if (lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x95, 0x84, 0x72, m5stack::axp_i2c_freq))
         { // GPIO4 enable
           // AXP192_LDO2 = LCD PWR
           // AXP192_DC3  = LCD BL
           // AXP192_IO4  = LCD RST
-          if (use_reset) lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x96, 0, ~0x02); // GPIO4 LOW (LCD RST)
-          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x28, 0xF0, ~0);   // set LDO2 3300mv // LCD PWR
-          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x12, 0x06, ~0);   // LDO2 and DC3 enable (DC3 = LCD BL)
-          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x96, 2, ~0);      // GPIO4 HIGH (LCD RST)
+          if (use_reset) lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x96, 0, ~0x02, m5stack::axp_i2c_freq); // GPIO4 LOW (LCD RST)
+          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x28, 0xF0, ~0, m5stack::axp_i2c_freq);   // set LDO2 3300mv // LCD PWR
+          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x12, 0x06, ~0, m5stack::axp_i2c_freq);   // LDO2 and DC3 enable (DC3 = LCD BL)
+          lgfx::i2c::writeRegister8(m5stack::axp_i2c_port, m5stack::axp_i2c_addr, 0x96, 2, ~0, m5stack::axp_i2c_freq);      // GPIO4 HIGH (LCD RST)
+
+          ets_delay_us(128); // AXPの起動後、LCDがアクセス可能になるまで少し待つ。
 
           bus_cfg.pin_mosi = 23;
           bus_cfg.pin_miso = 38;
@@ -698,9 +745,10 @@ namespace lgfx
               cfg.y_min = 0;
               cfg.y_max = 279;
               t->config(cfg);
-              touch(t);
-              float affine[6] = { 0, -1, 240, 1, 0, 0};
-              t->setCalibrateAffine(affine);
+              _panel_last->touch(t);
+
+              float affine[6] = { 1, 0, 0, 0, 1, 0 };
+              _panel_last->setCalibrateAffine(affine);
               _touch_last = t;
             }
 
@@ -714,19 +762,14 @@ namespace lgfx
 
 #endif
 
+      board = board_t::board_unknown;
+
       goto init_clear;
   init_clear:
 
       panel(_panel_last);
 
-      if (nvs_board != _board) {
-        if (0 == nvs_open(LIBRARY_NAME, NVS_READWRITE, &nvs_handle)) {
-          ESP_LOGW(LIBRARY_NAME, "[Autodetect] save to NVS : board:%d", _board);
-          nvs_set_u32(nvs_handle, NVS_KEY, _board);
-          nvs_close(nvs_handle);
-        }
-      }
-      return (_board != lgfx::board_t::board_unknown);
+      return board;
     }
   };
 

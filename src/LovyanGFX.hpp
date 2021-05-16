@@ -32,9 +32,16 @@ Contributors:
 #undef setFont
 #endif
 
-#if __has_include("lgfx/v1_init.hpp") && ( defined ( LGFX_USER_SETUP ) || defined ( LGFX_USE_V1 ) || !__has_include("lgfx/v0_init.hpp") )
+//#if __has_include("lgfx/v1_init.hpp") && ( defined ( LGFX_AUTODETECT ) || defined ( LGFX_USE_V1 ) || !__has_include("lgfx/v0_init.hpp") )
+#if __has_include("lgfx/v1_init.hpp") && ( defined ( LGFX_USE_V1 ) || !__has_include("lgfx/v0_init.hpp") )
 
  #include "lgfx/v1_init.hpp"
+
+ #if defined ( LGFX_AUTODETECT )
+
+  #include "LGFX_AUTODETECT.hpp"
+
+ #endif
 
 #else  // if defined ( LGFX_USE_V0 )
 
@@ -42,18 +49,6 @@ Contributors:
   #include "lgfx/v0_init.hpp"
  #endif
 
-#endif
-
-#if defined ( LGFX_USER_SETUP )
- #if __has_include( LGFX_USER_SETUP )
-
-  #include LGFX_USER_SETUP
-
- #else
-
-  #pragma message( "file not found : " LGFX_USER_SETUP )
-
- #endif
 #endif
 
 #endif

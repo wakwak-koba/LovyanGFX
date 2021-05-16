@@ -301,19 +301,24 @@ void setup(void)
   // SPIバスとパネルの初期化を実行すると使用可能になります。
   lcd.init();
 
-  if (lcd.width() > 240 || lcd.height() > 240) lcd.setTextSize(2);
+  lcd.setTextSize((std::max(lcd.width(), lcd.height()) + 255) >> 8);
 
   if (lcd.touch())
   {
-    if (lcd.width() < lcd.height()) lcd.setRotation(3 & (lcd.getRotation() + 1));
+    if (lcd.width() < lcd.height()) lcd.setRotation(lcd.getRotation() ^ 1);
 
     // Draw the information text.
     // 画面に案内文章を描画します。
-    lcd.drawString("touch the arrow marker.", 0, lcd.height()>>1);
+    lcd.setTextDatum(textdatum_t::middle_center);
+    lcd.drawString("touch the arrow marker.", lcd.width()>>1, lcd.height() >> 1);
+    lcd.setTextDatum(textdatum_t::top_left);
 
     // If the touch is enabled, perform calibration. Touch the arrow tips that appear in the four corners of the screen in order.
     // タッチを使用する場合、キャリブレーションを行います。画面の四隅に表示される矢印の先端を順にタッチしてください。
-    lcd.calibrateTouch(nullptr, 0xFFFFFFU, 0x000000U, 30);
+    std::uint16_t fg = TFT_WHITE;
+    std::uint16_t bg = TFT_BLACK;
+    if (lcd.isEPD()) std::swap(fg, bg);
+    lcd.calibrateTouch(nullptr, fg, bg, std::max(lcd.width(), lcd.height()) >> 3);
 
     lcd.clear();
   }
@@ -338,6 +343,7 @@ void loop(void)
   lcd.drawString("B", 50, 16);
 
   lcd.drawRect(30,30,lcd.width()-60,lcd.height()-60,random(65536));
+  lcd.drawFastHLine(0, 0, 10);
 
   lcd.endWrite();
 

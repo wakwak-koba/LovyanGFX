@@ -73,11 +73,12 @@ namespace lgfx
       UPDATE_MODE_NONE    = 8
     };        // The ones marked with * are more commonly used
 
-    rect16_t _range_new;
-    rect16_t _range_old;
+    range_rect_t _range_new;
+    range_rect_t _range_old;
 
     std::uint_fast16_t _xpos = 0;
     std::uint_fast16_t _ypos = 0;
+    std::uint_fast8_t _it8951_rotation = 0;
     bool _in_transaction = false;
 
     bool _wait_busy( std::uint32_t timeout = 1000);
@@ -92,7 +93,7 @@ namespace lgfx
     bool _update_raw_area( epd_update_mode_t mode);
     bool _read_raw_line( std::int32_t raw_x, std::int32_t raw_y, std::int32_t len, std::uint16_t* buf);
 
-    fastread_dir_t get_fastread_dir(void) const override { return _internal_rotation & 1 ? fastread_vertical : fastread_horizontal; }
+    fastread_dir_t get_fastread_dir(void) const override { return _it8951_rotation & 1 ? fastread_vertical : fastread_horizontal; }
   };
 
 //----------------------------------------------------------------------------

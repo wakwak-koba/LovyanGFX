@@ -27,6 +27,7 @@ Contributors:
 #elif defined (__SAMD51__)
 
 #include "samd51/Bus_SPI.hpp"
+#include "samd51/Bus_I2C.hpp"
 
 #elif defined (STM32F2xx) || defined (STM32F4xx) || defined (STM32F7xx)
 

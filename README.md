@@ -467,6 +467,7 @@ main : [FreeBSD](license.txt)
 TJpgDec : [original](src/lgfx/utility/lgfx_tjpgd.c) ChaN  
 Pngle : [MIT](https://github.com/kikuchan/pngle/blob/master/LICENSE) kikuchan  
 QRCode : [MIT](https://github.com/ricmoo/QRCode/blob/master/LICENSE.txt) Richard Moore and Nayuki  
+result : [MIT](https://github.com/bitwizeshift/result/blob/master/LICENSE) Matthew Rodusek  
 GFX font and GLCD font : [2-clause BSD](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/license.txt) Adafruit Industries  
 Font 2,4,6,7,8 :  [FreeBSD](https://github.com/Bodmer/TFT_eSPI/blob/master/license.txt) Bodmer  
 converted IPA font : [IPA Font License](src/lgfx/Fonts/IPA/IPA_Font_License_Agreement_v1.0.txt) IPA  

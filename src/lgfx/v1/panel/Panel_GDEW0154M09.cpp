@@ -382,14 +382,13 @@ namespace lgfx
 
   void Panel_GDEW0154M09::_draw_pixel(std::int32_t x, std::int32_t y, std::uint32_t value)
   {
-    if (_internal_rotation & 1) { std::swap(x, y); }
-    switch (_internal_rotation) {
-    case 1: case 2: case 6: case 7:  x = _cfg.panel_width - x - 1; break;
-    default: break;
-    }
-    switch (_internal_rotation) {
-    case 2: case 3: case 4: case 7:  y = _cfg.panel_height - y - 1; break;
-    default: break;
+    std::uint_fast8_t r = _internal_rotation;
+    if (r)
+    {
+      if (r & 1) { std::swap(x, y); }
+      std::uint_fast8_t rb = 1 << r;
+      if (rb & 0b11000110) { x = _cfg.panel_width - x - 1; }  // case 1:2:6:7:
+      if (rb & 0b10011100) { y = _cfg.panel_height - y - 1; } // case 2:3:4:7:
     }
     std::uint32_t idx = ((_cfg.panel_width + 7) & ~7) * y + x;
     bool flg = 256 <= value + Bayer[(x & 3) | (y & 3) << 2];
@@ -399,20 +398,19 @@ namespace lgfx
 
   bool Panel_GDEW0154M09::_read_pixel(std::int32_t x, std::int32_t y)
   {
-    if (_internal_rotation & 1) { std::swap(x, y); }
-    switch (_internal_rotation) {
-    case 1: case 2: case 6: case 7:  x = _cfg.panel_width - x - 1; break;
-    default: break;
-    }
-    switch (_internal_rotation) {
-    case 2: case 3: case 4: case 7:  y = _cfg.panel_height - y - 1; break;
-    default: break;
+    std::uint_fast8_t r = _internal_rotation;
+    if (r)
+    {
+      if (r & 1) { std::swap(x, y); }
+      std::uint_fast8_t rb = 1 << r;
+      if (rb & 0b11000110) { x = _cfg.panel_width - x - 1; }  // case 1:2:6:7:
+      if (rb & 0b10011100) { y = _cfg.panel_height - y - 1; } // case 2:3:4:7:
     }
     std::uint32_t idx = ((_cfg.panel_width + 7) & ~7) * y + x;
     return _buf[idx >> 3] & (0x80 >> (idx & 7));
   }
 
-  void Panel_GDEW0154M09::_exec_transfer(std::uint32_t cmd, const rect16_t& range, bool invert)
+  void Panel_GDEW0154M09::_exec_transfer(std::uint32_t cmd, const range_rect_t& range, bool invert)
   {
     std::int32_t xs = range.left & ~7;
     std::int32_t xe = range.right & ~7;

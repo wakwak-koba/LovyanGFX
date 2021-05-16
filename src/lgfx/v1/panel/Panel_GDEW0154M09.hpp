@@ -63,8 +63,8 @@ namespace lgfx
     static constexpr unsigned long _refresh_msec = 320;
     std::uint8_t* _buf = nullptr;
 
-    rect16_t _range_new;
-    rect16_t _range_old;
+    range_rect_t _range_new;
+    range_rect_t _range_old;
     std::int32_t _xpos = 0;
     std::int32_t _ypos = 0;
     unsigned long _send_msec = 0;
@@ -72,7 +72,7 @@ namespace lgfx
     bool _wait_busy(std::uint32_t timeout = 1000);
     void _draw_pixel(std::int32_t x, std::int32_t y, std::uint32_t value);
     bool _read_pixel(std::int32_t x, std::int32_t y);
-    void _exec_transfer(std::uint32_t cmd, const rect16_t& range, bool invert = false);
+    void _exec_transfer(std::uint32_t cmd, const range_rect_t& range, bool invert = false);
     void _close_transfer(void);
     void _update_transferred_rect(std::uint32_t &xs, std::uint32_t &ys, std::uint32_t &xe, std::uint32_t &ye);
 

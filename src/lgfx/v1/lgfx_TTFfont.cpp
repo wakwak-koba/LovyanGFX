@@ -6,8 +6,7 @@
 
 #include <algorithm>
 
-// #include <esp_log.h> // for log output
-// #include <Arduino.h> // for log output
+//#include "../lgfx_debug.hpp"
 
 namespace lgfx
 {
@@ -28,34 +27,79 @@ namespace lgfx
 
   void TTFfont::getDefaultMetric(FontMetrics *metrics) const
   {
-
 // unimplemented
+metrics->x_offset = 0;
+metrics->width = _horizontal.advance_Width_Max;
+metrics->x_advance = _horizontal.advance_Width_Max;
+metrics->y_advance = _vertical.advance_Height_Max;
+metrics->y_offset = 0;
+metrics->baseline = _vertical.Ascender;
+  }
 
+  static void _load_metrics(std::uint16_t *width, std::int16_t *bearing, DataWrapper* data, std::size_t glyph_index, std::size_t k, std::size_t table_pos, std::size_t table_size)
+  {
+    std::size_t table_end = table_pos + table_size;
+
+    bool contain = glyph_index < k;
+    table_pos += 4 * (contain ? glyph_index : (k - 1));
+
+    if ( table_pos + 4 <= table_end )
+    {
+      data->seek( table_pos );
+      *width = data->read16swap();
+      bool has_data = contain;
+      if (!contain)
+      {
+        table_pos += 4 + 2 * (glyph_index - k);
+        if (table_pos + 2 <= table_end)
+        {
+          data->seek( table_pos );
+          has_data = true;
+        }
+      }
+      if (has_data)
+      {
+        *bearing = data->read16swap();
+      }
+    }
+  }
+
+  TTFfont::Metrics_t TTFfont::_get_metrics(std::uint32_t glyph_index) const
+  {
+// ---- tt_face_get_metrics
+    Metrics_t res;
+    res.advance_height = _header.Units_Per_EM;
+
+    _load_metrics(&res.advance_width, &res.left_bearing, _fontData, glyph_index, _horizontal.number_Of_HMetrics, _horz_metrics_offset, _horz_metrics_size);
+    if (_vertical_info)
+      _load_metrics(&res.advance_height, &res.top_bearing, _fontData, glyph_index, _horizontal.number_Of_HMetrics, _vert_metrics_offset, _vert_metrics_size);
+
+//  LGFX_DEBUG_LOG( "width:%d lb:%d height:%d tb:%d \r\n", res.advance_width, res.left_bearing, res.advance_height, res.top_bearing);
+
+    return res;
   }
 
   bool TTFfont::updateFontMetric(FontMetrics *metrics, std::uint16_t uniCode) const
   {
-/*
-    Serial.printf("uniCode:%04x \r\n", uniCode);
-    std::uint16_t index;
-    if (!getUnicodeIndex(uniCode, &index)) return false;
-
-// unimplemented
-// ---- tt_get_metrics
-    std::int16_t left_bearing = 0, top_bearing = 0;
-    std::uint16_t advance_width = 0, advance_height = 0;
-
-    auto table_pos  = _horz_metrics_offset;
-    auto table_size = _horz_metrics_size;
+//LGFX_DEBUG_LOG("uniCode:%04x \r\n", uniCode);
+    std::uint16_t glyph_index;
+    if (!_get_glyph_index(uniCode, &glyph_index)) return false;
 
     auto data = _fontData;
-    std::uint16_t k = _horizontal.number_Of_HMetrics;
+    data->preRead();
+    auto ttf_mtx = _get_metrics(glyph_index);
+    data->postRead();
 
-*/
+metrics->x_advance = ttf_mtx.advance_width  >> 6;
+metrics->width     = ttf_mtx.advance_width  >> 6;
+metrics->y_advance = ttf_mtx.advance_height >> 6;
+metrics->y_offset  = ttf_mtx.top_bearing    >> 6;
+metrics->height    = ttf_mtx.advance_height >> 6;
+
     return true;
   }
 
-  bool TTFfont::getUnicodeIndex(std::uint16_t unicode, std::uint16_t *index) const
+  bool TTFfont::_get_glyph_index(std::uint16_t unicode, std::uint16_t *index) const
   {
     std::uint_fast16_t num_segs2      = _cmap.rawdata[3];
     //std::uint_fast16_t search_range   = _cmap.rawdata[4];
@@ -81,23 +125,22 @@ namespace lgfx
         if (*index)
         {
           *index = (*index + delta) & 0xFFFFu;
-//Serial.printf("hasOffset:%d  idx:%d\r\n", *offset, *index);
+// LGFX_DEBUG_LOG("hasOffset:%d  idx:%d\r\n", *offset, *index);
         }
       }
       else
       {
         *index = (charcode + delta) & 0xFFFFu;
-//Serial.printf("  idx:%d\r\n", *index);
+// LGFX_DEBUG_LOG("  idx:%d\r\n", *index);
       }
       return (*index <= _max_profile.numGlyphs);
     }
-//Serial.printf("start_array:%04x end_array:%04x idx:%d \r\n", start_array[idx], end_array[idx], idx);
+// LGFX_DEBUG_LOG("start_array:%04x end_array:%04x idx:%d \r\n", start_array[idx], end_array[idx], idx);
     return false;
   }
 
   bool TTFfont::loadFont(DataWrapper* data)
   {
-//Serial.println("TTFfont loadFont");
     #define FT_MAKE_TAG( _x1, _x2, _x3, _x4 ) \
               ( ( (std::uint32_t)_x1 << 24 ) |     \
                 ( (std::uint32_t)_x2 << 16 ) |     \
@@ -186,8 +229,8 @@ namespace lgfx
       return false;
     }
 
-//ESP_LOGI("lgfx_fonts", "-- Number of tables: %10u ",    _sfnt.num_tables );
-//ESP_LOGI("lgfx_fonts", "-- Format version:   0x%08lx", _sfnt.format_tag );
+//LGFX_DEBUG_LOG("-- Number of tables: %10u ",    _sfnt.num_tables );
+//LGFX_DEBUG_LOG("-- Format version:   0x%08lx", _sfnt.format_tag );
     // if ( _sfnt.format_tag != TTAG_OTTO ) { check_table_dir }
     if (_sfnt.num_tables <= 0)
     {
@@ -210,8 +253,7 @@ namespace lgfx
       entry[i].Offset   = data->read32swap();
       entry[i].Length   = data->read32swap();
 /*
-      ESP_LOGI("lgfx_fonts"
-              , "  %c%c%c%c  %08lx  %08lx  %08lx",
+      LGFX_DEBUG_LOG("  %c%c%c%c  %08lx  %08lx  %08lx",
                     (char)( entry[i].Tag >> 24 ),
                     (char)( entry[i].Tag >> 16 ),
                     (char)( entry[i].Tag >> 8  ),
@@ -420,12 +462,8 @@ namespace lgfx
     metric_Data_Format     = __builtin_bswap16(metric_Data_Format    );
     number_Of_HMetrics     = __builtin_bswap16(number_Of_HMetrics    );
 
-// ESP_LOGI("lgfx_fonts", "hori Ascender:          %5d", Ascender );
-// ESP_LOGI("lgfx_fonts", "hori Descender:         %5d", Descender );
-// ESP_LOGI("lgfx_fonts", "hori number_Of_Metrics: %5u", number_Of_HMetrics );
-
-    long_metrics  = NULL;
-    short_metrics = NULL;
+    long_metrics  = nullptr;
+    short_metrics = nullptr;
   }
 
   void TTFfont::TT_OS2::load(DataWrapper* data)
@@ -447,12 +485,12 @@ namespace lgfx
     yStrikeoutSize      = __builtin_bswap16(yStrikeoutSize     );
     yStrikeoutPosition  = __builtin_bswap16(yStrikeoutPosition );
     sFamilyClass        = __builtin_bswap16(sFamilyClass       );
-    // panose[0~9]
+    // uint8 panose[0~9]
     ulUnicodeRange1     = __builtin_bswap32(ulUnicodeRange1    );
     ulUnicodeRange2     = __builtin_bswap32(ulUnicodeRange2    );
     ulUnicodeRange3     = __builtin_bswap32(ulUnicodeRange3    );
     ulUnicodeRange4     = __builtin_bswap32(ulUnicodeRange4    );
-    // achVendID[0~3]
+    // uint8 achVendID[0~3]
     fsSelection         = __builtin_bswap16(fsSelection        );
     usFirstCharIndex    = __builtin_bswap16(usFirstCharIndex   );
     usLastCharIndex     = __builtin_bswap16(usLastCharIndex    );

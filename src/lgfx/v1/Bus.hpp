@@ -69,12 +69,12 @@ namespace lgfx
     /// 蓄積したDMA転送キューの送信を実行する。
     virtual void execDMAQueue(void) = 0;
 
-    /// DMA用のバッファを取得する。内部的には2個のバッファを交互に使用する。
+    /// DMA用のバッファを取得する。バスの実装によっては内部的には2個のバッファを交互に使用する。
     /// 繰返し実行した場合は前回と異なるポインタを得るが、前々回と同じになる場合がある点に注意すること。
     virtual std::uint8_t* getDMABuffer(std::uint32_t length) = 0;
 
     /// D/Cピンをlowにしてデータを送信する。
-    virtual void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) = 0;
+    virtual bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) = 0;
 
     /// D/Cピンをhighにしてデータを送信する。
     virtual void writeData(std::uint32_t data, std::uint_fast8_t bit_length) = 0;
@@ -91,7 +91,7 @@ namespace lgfx
     virtual void beginRead(void) = 0;
     virtual void endRead(void) = 0;
     virtual std::uint32_t readData(std::uint_fast8_t bit_length) = 0;
-    virtual void readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma = false) = 0;
+    virtual bool readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma = false) = 0;
     virtual void readPixels(void* dst, pixelcopy_t* pc, std::uint32_t length) = 0;
   };
 
@@ -110,7 +110,7 @@ namespace lgfx
     void execDMAQueue(void) override {}
     std::uint8_t* getDMABuffer(std::uint32_t length) override { return nullptr; }
 
-    void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override {}
+    bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override { return false; }
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override {}
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override {}
     void writePixels(pixelcopy_t* pc, std::uint32_t length) override {}
@@ -119,7 +119,7 @@ namespace lgfx
     void beginRead(void) override {}
     void endRead(void) override {}
     std::uint32_t readData(std::uint_fast8_t bit_length) override { return 0; }
-    void readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma = false) override {}
+    bool readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma = false) override { return false; }
     void readPixels(void* dst, pixelcopy_t* pc, std::uint32_t length) override {}
   };
 

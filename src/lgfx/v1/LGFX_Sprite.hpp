@@ -60,7 +60,10 @@ namespace lgfx
     void readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param) override;
     void copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y) override;
 
+    std::uint32_t readPixelValue(std::uint_fast16_t x, std::uint_fast16_t y);
+
   protected:
+    void _rotate_pixelcopy(std::uint_fast16_t& x, std::uint_fast16_t& y, std::uint_fast16_t& w, std::uint_fast16_t& h, pixelcopy_t* param, std::uint32_t& nextx, std::uint32_t& nexty);
 
     SpriteBuffer _img;
 
@@ -78,7 +81,7 @@ namespace lgfx
     LGFX_Sprite(LovyanGFX* parent)
     : LovyanGFX()
     , _parent(parent)
-    , _bitwidth(0)
+//    , _bitwidth(0)
     {
       _read_conv = _write_conv;
       _panel = &_panel_sprite;
@@ -104,7 +107,7 @@ namespace lgfx
 
     void deleteSprite(void)
     {
-      _bitwidth = 0;
+//      _bitwidth = 0;
       _clip_l = 0;
       _clip_t = 0;
       _clip_r = -1;
@@ -127,7 +130,7 @@ namespace lgfx
       _panel_sprite.setBuffer(buffer, w, h, &_write_conv);
       _img = _panel_sprite.getBuffer();
 
-      _bitwidth = (w + _write_conv.x_mask) & (~(std::uint32_t)_write_conv.x_mask);
+//      _bitwidth = (w + _write_conv.x_mask) & (~(std::uint32_t)_write_conv.x_mask);
       _sw = w;
       _clip_r = w - 1;
       _xpivot = w >> 1;
@@ -140,13 +143,13 @@ namespace lgfx
     void* createSprite(std::int32_t w, std::int32_t h)
     {
       _img = _panel_sprite.createSprite(w, h, &_write_conv, _psram);
-      if (_img == nullptr) return nullptr;
-
-      if (!_palette && 0 == _write_conv.bytes)
-      {
-        createPalette();
+      if (_img) {
+        if (!_palette && 0 == _write_conv.bytes)
+        {
+          createPalette();
+        }
       }
-      _bitwidth = (w + _write_conv.x_mask) & (~(std::uint32_t)_write_conv.x_mask);
+//      _bitwidth = (w + _write_conv.x_mask) & (~(std::uint32_t)_write_conv.x_mask);
       setRotation(getRotation());
 
       _sw = width();
@@ -305,27 +308,7 @@ namespace lgfx
       return createSprite(w, h);
     }
 
-    std::uint32_t readPixelValue(std::int32_t x, std::int32_t y)
-    {
-      if (x < 0 || x >= width() || y < 0 || y >= height()) return 0;
-      std::int32_t index = x + y * _bitwidth;
-      auto bits = _read_conv.bits;
-      if (bits >= 8)
-      {
-        if (bits == 8)
-        {
-          return _img8[index];
-        }
-        else if (bits == 16)
-        {
-          return _img16[index];
-        }
-        return (std::uint32_t)_img24[index];
-      }
-      index *= bits;
-      std::uint8_t mask = (1 << bits) - 1;
-      return (_img8[index >> 3] >> (-(index + bits) & 7)) & mask;
-    }
+    std::uint32_t readPixelValue(std::int32_t x, std::int32_t y) { return _panel_sprite.readPixelValue(x, y); }
 
     template<typename T>
     __attribute__ ((always_inline)) inline void fillSprite (const T& color) { fillScreen(color); }
@@ -392,7 +375,7 @@ namespace lgfx
     LovyanGFX* _parent;
 
     SpriteBuffer _palette;
-    std::int32_t _bitwidth;
+//    std::int32_t _bitwidth;
 
     bool _psram = false;
 
@@ -457,6 +440,8 @@ namespace lgfx
 
       data->seek(seekOffset);
 
+      auto bitwidth = _panel_sprite._bitwidth;
+
       std::size_t buffersize = ((w * bpp + 31) >> 5) << 2;  // readline 4Byte align.
       std::uint8_t lineBuffer[buffersize];  // readline 4Byte align.
       if (bpp <= 8) {
@@ -469,13 +454,13 @@ namespace lgfx
           } else {
             data->read(lineBuffer, buffersize);
           }
-          memcpy(&_img8[y * _bitwidth * bpp >> 3], lineBuffer, (w * bpp + 7) >> 3);
+          memcpy(&_img8[y * bitwidth * bpp >> 3], lineBuffer, (w * bpp + 7) >> 3);
           y += flow;
         } while (--h);
       } else if (bpp == 16) {
         do {
           data->read(lineBuffer, buffersize);
-          auto img = &_img8[y * _bitwidth * bpp >> 3];
+          auto img = &_img8[y * bitwidth * bpp >> 3];
           y += flow;
           for (std::size_t i = 0; i < buffersize; ++i) {
             img[i] = lineBuffer[i ^ 1];
@@ -484,7 +469,7 @@ namespace lgfx
       } else if (bpp == 24) {
         do {
           data->read(lineBuffer, buffersize);
-          auto img = &_img8[y * _bitwidth * bpp >> 3];
+          auto img = &_img8[y * bitwidth * bpp >> 3];
           y += flow;
           for (std::size_t i = 0; i < buffersize; i += 3) {
             img[i    ] = lineBuffer[i + 2];
@@ -495,7 +480,7 @@ namespace lgfx
       } else if (bpp == 32) {
         do {
           data->read(lineBuffer, buffersize);
-          auto img = &_img8[y * _bitwidth * 3];
+          auto img = &_img8[y * bitwidth * 3];
           y += flow;
           for (std::size_t i = 0; i < buffersize; i += 4) {
             img[(i>>2)*3    ] = lineBuffer[i + 2];
@@ -909,8 +894,8 @@ namespace lgfx
 
     bool isReadable_impl(void) const override { return true; }
     std::int_fast8_t getRotation_impl(void) const override { return 0; }
-    void beginTransaction_impl(void) override {}
-    void endTransaction_impl(void) override {}
+    void beginTrans_impl(void) override {}
+    void endTrans_impl(void) override {}
     void initDMA_impl(void) override {}
     void waitDMA_impl(void) override {}
     bool dmaBusy_impl(void) override { return false; }

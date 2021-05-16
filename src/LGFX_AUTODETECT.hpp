@@ -52,7 +52,7 @@ namespace lgfx
     , board_ESP32_S2_Kaluga_1
     };
   }
-  using board_t = boards::board_t;
+  using namespace boards;
 }
 
 
@@ -93,6 +93,10 @@ namespace lgfx
   #include "lgfx/v1_autodetect/LGFX_AutoDetect_SAMD51.hpp"
 
  #endif
+
+#else
+
+  #include "lgfx/v1_autodetect/LGFX_AutoDetect_STM32.hpp"
 
 #endif
 

@@ -18,6 +18,7 @@ Contributors:
 #include "Panel_Device.hpp"
 #include "../Bus.hpp"
 #include "../Light.hpp"
+#include "../Touch.hpp"
 #include "../platforms/common.hpp"
 #include "../misc/pixelcopy.hpp"
 
@@ -29,10 +30,10 @@ namespace lgfx
 
   Panel_Device::Panel_Device(void)
   {
-    bus(nullptr);
+    setBus(nullptr);
   }
 
-  void Panel_Device::bus(IBus* bus)
+  void Panel_Device::setBus(IBus* bus)
   {
     static Bus_NULL nullobj;
     _bus = bus ? bus : &nullobj;
@@ -43,12 +44,24 @@ namespace lgfx
     if (_light) _light->setBrightness(brightness);
   }
 
+  void Panel_Device::initBus(void)
+  {
+    _bus->init();
+  }
+
   void Panel_Device::init(bool use_reset)
   {
     _bus->init();
     init_cs();
     init_rst();
-    if (_light) _light->init(0);
+    if (_light)
+    {
+      _light->init(0);
+    }
+    if (_touch)
+    {
+      _touch->init();
+    }
     if (use_reset)
     {
       reset();
@@ -111,6 +124,30 @@ namespace lgfx
     }
   }
 */
+
+  void Panel_Device::command_list(const std::uint8_t *addr)
+  {
+    for (;;)
+    {                // For each command...
+      if (*reinterpret_cast<const std::uint16_t*>(addr) == 0xFFFF) break;
+      writeCommand(*addr++, 1);  // Read, issue command
+      std::uint_fast8_t numArgs = *addr++;  // Number of args to follow
+      std::uint_fast8_t ms = numArgs & CMD_INIT_DELAY;       // If hibit set, delay follows args
+      numArgs &= ~CMD_INIT_DELAY;          // Mask out delay bit
+      if (numArgs)
+      {
+        do
+        {                   // For each argument...
+          writeData(*addr++, 1);  // Read, issue argument
+        } while (--numArgs);
+      }
+      if (ms)
+      {
+        ms = *addr++;        // Read post-command delay time (ms)
+        delay( (ms==255 ? 500 : ms) );
+      }
+    }
+  }
 
 //----------------------------------------------------------------------------
 
@@ -257,30 +294,145 @@ namespace lgfx
 
 //----------------------------------------------------------------------------
 
-  void Panel_Device::command_list(const std::uint8_t *addr)
+  void Panel_Device::setTouch(ITouch* touch)
   {
-    for (;;)
-    {                // For each command...
-      if (*reinterpret_cast<const std::uint16_t*>(addr) == 0xFFFF) break;
-      writeCommand(*addr++, 1);  // Read, issue command
-      std::uint_fast8_t numArgs = *addr++;  // Number of args to follow
-      std::uint_fast8_t ms = numArgs & CMD_INIT_DELAY;       // If hibit set, delay follows args
-      numArgs &= ~CMD_INIT_DELAY;          // Mask out delay bit
-      if (numArgs)
+    _touch = touch;
+    touchCalibrate();
+  }
+
+  void Panel_Device::touchCalibrate(void)
+  {
+    if (_touch == nullptr) return;
+
+    auto cfg = _touch->config();
+    std::uint16_t parameters[8] =
+      { cfg.x_min, cfg.y_min
+      , cfg.x_min, cfg.y_max
+      , cfg.x_max, cfg.y_min
+      , cfg.x_max, cfg.y_max };
+    setCalibrate(parameters);
+  }
+
+  void Panel_Device::setCalibrateAffine(float affine[6])
+  {
+    memcpy(_affine, affine, sizeof(float) * 6);
+  }
+
+  void Panel_Device::setCalibrate(std::uint16_t *parameters)
+  {
+    std::uint32_t vect[6] = {0,0,0,0,0,0};
+    float mat[3][3] = {{0,0,0},{0,0,0},{0,0,0}};
+    float a;
+
+    auto w = _cfg.panel_width;
+    auto h = _cfg.panel_height;
+    if (_touch->config().offset_rotation & 1)
+    {
+      std::swap(w, h);
+    }
+
+    for ( int i = 0; i < 4; ++i ) {
+      std::int32_t tx = (i & 2) ? (w - 1) : 0;
+      std::int32_t ty = (i & 1) ? (h - 1) : 0;
+      std::int32_t px = parameters[i*2  ];
+      std::int32_t py = parameters[i*2+1];
+      a = px * px;
+      mat[0][0] += a;
+      a = px * py;
+      mat[0][1] += a;
+      mat[1][0] += a;
+      a = px;
+      mat[0][2] += a;
+      mat[2][0] += a;
+      a = py * py;
+      mat[1][1] += a;
+      a = py;
+      mat[1][2] += a;
+      mat[2][1] += a;
+      mat[2][2] += 1;
+
+      vect[0] += px * tx;
+      vect[1] += py * tx;
+      vect[2] +=      tx;
+      vect[3] += px * ty;
+      vect[4] += py * ty;
+      vect[5] +=      ty;
+    }
+
+    {
+      float det = 1;
+      for ( int k = 0; k < 3; ++k )
       {
-        do
-        {                   // For each argument...
-          writeData(*addr++, 1);  // Read, issue argument
-        } while (--numArgs);
-      }
-      if (ms)
-      {
-        ms = *addr++;        // Read post-command delay time (ms)
-        delay( (ms==255 ? 500 : ms) );
+        float t = mat[k][k];
+        det *= t;
+        for ( int i = 0; i < 3; ++i ) mat[k][i] /= t;
+
+        mat[k][k] = 1 / t;
+        for ( int j = 0; j < 3; ++j )
+        {
+          if ( j == k ) continue;
+
+          float u = mat[j][k];
+
+          for ( int i = 0; i < 3; ++i )
+          {
+            if ( i != k ) mat[j][i] -= mat[k][i] * u;
+            else mat[j][i] = -u / t;
+          }
+        }
       }
     }
+
+    float v0 = vect[0];
+    float v1 = vect[1];
+    float v2 = vect[2];
+    _affine[0] = mat[0][0] * v0 + mat[0][1] * v1 + mat[0][2] * v2;
+    _affine[1] = mat[1][0] * v0 + mat[1][1] * v1 + mat[1][2] * v2;
+    _affine[2] = mat[2][0] * v0 + mat[2][1] * v1 + mat[2][2] * v2;
+    float v3 = vect[3];
+    float v4 = vect[4];
+    float v5 = vect[5];
+    _affine[3] = mat[0][0] * v3 + mat[0][1] * v4 + mat[0][2] * v5;
+    _affine[4] = mat[1][0] * v3 + mat[1][1] * v4 + mat[1][2] * v5;
+    _affine[5] = mat[2][0] * v3 + mat[2][1] * v4 + mat[2][2] * v5;
+  }
+
+  void Panel_Device::convertRawXY(std::int32_t *x, std::int32_t *y)
+  {
+    std::int32_t tx = (_affine[0] * (float)*x + _affine[1] * (float)*y) + _affine[2];
+    std::int32_t ty = (_affine[3] * (float)*x + _affine[4] * (float)*y) + _affine[5];
+
+    auto r = _internal_rotation;
+    if (_touch) {
+      auto offset = _touch->config().offset_rotation;
+      r = ((r + offset) & 3) | ((r & 4) ^ (offset & 4));
+    }
+    if ( r & 1               ) { std::swap(tx, ty); }
+    if ( r & 2               ) { tx = (_width  - 1) - tx; }
+    if ((1 << r) & 0b10010110) { ty = (_height - 1) - ty; }
+    *x = tx;
+    *y = ty;
+  }
+
+  std::uint_fast8_t Panel_Device::getTouchRaw(touch_point_t* tp, std::int_fast8_t number)
+  {
+    if (_touch == nullptr) return 0;
+
+    bool need_transaction = (getStartCount() && _touch->config().bus_shared);
+    if (need_transaction) { endTransaction(); }
+    auto res = _touch->getTouchRaw(tp, number);
+    if (need_transaction) { beginTransaction(); }
+    return res;
+  }
+
+  std::uint_fast8_t Panel_Device::getTouch(touch_point_t* tp, std::int_fast8_t number)
+  {
+    auto res = getTouchRaw(tp, number);
+    if (res) { convertRawXY(&tp->x, &tp->y); }
+    return res;
   }
 
 //----------------------------------------------------------------------------
+
  }
 }

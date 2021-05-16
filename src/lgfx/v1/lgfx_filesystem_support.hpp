@@ -309,7 +309,7 @@ namespace lgfx
         return false;
       }
 
-      void close() override { _http.end(); }
+      void close(void) override { _http.end(); }
 
     private:
       HTTPClient _http;

@@ -29,8 +29,8 @@ Contributors:
 #include "misc/pixelcopy.hpp"
 #include "misc/DataWrapper.hpp"
 #include "lgfx_fonts.hpp"
-#include "Panel.hpp"
 #include "Touch.hpp"
+#include "panel/Panel_Device.hpp"
 
 namespace lgfx
 {
@@ -57,6 +57,8 @@ namespace lgfx
     LGFX_INLINE static constexpr std::uint32_t swap888( std::uint8_t r, std::uint8_t g, std::uint8_t b) { return lgfx::swap888( r, g, b); }
     LGFX_INLINE static constexpr std::uint8_t  color16to8(std::uint32_t rgb565) { return lgfx::convert_rgb565_to_rgb332(rgb565); }
     LGFX_INLINE static constexpr std::uint16_t color8to16(std::uint32_t rgb332) { return lgfx::convert_rgb332_to_rgb565(rgb332); }
+    LGFX_INLINE static constexpr std::uint32_t color16to24(std::uint32_t rgb565) { return lgfx::convert_rgb565_to_rgb888(rgb565); }
+    LGFX_INLINE static constexpr std::uint16_t color24to16(std::uint32_t rgb888) { return lgfx::convert_rgb888_to_rgb565(rgb888); }
 
     LGFX_INLINE   void setColor(std::uint8_t r, std::uint8_t g, std::uint8_t b) { setColor(lgfx::color888(r,g,b)); }
     LGFX_INLINE_T void setColor(T color) { setRawColor(_write_conv.convert(color)); }
@@ -120,15 +122,18 @@ namespace lgfx
                   void drawBezier      ( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, std::int32_t x3, std::int32_t y3);
     LGFX_INLINE_T void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2, const T& color)  { setColor(color); drawBezierHelper(x0, y0, x1, y1, x2, y2); }
                   void drawBezierHelper( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
-    LGFX_INLINE_T void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); drawArc( x, y, r0, r1, angle0, angle1); }
-                  void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
-    LGFX_INLINE_T void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); fillArc( x, y, r0, r1, angle0, angle1); }
-                  void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1);
+    LGFX_INLINE_T void drawEllipseArc  ( std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float angle0, float angle1, const T& color) { setColor(color); drawEllipseArc( x, y, r0x, r1x, r0y, r1y, angle0, angle1); }
+                  void drawEllipseArc  ( std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float angle0, float angle1);
+    LGFX_INLINE_T void fillEllipseArc  ( std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float angle0, float angle1, const T& color) { setColor(color); fillEllipseArc( x, y, r0x, r1x, r0y, r1y, angle0, angle1); }
+                  void fillEllipseArc  ( std::int32_t x, std::int32_t y, std::int32_t r0x, std::int32_t r1x, std::int32_t r0y, std::int32_t r1y, float angle0, float angle1);
+    LGFX_INLINE_T void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); drawEllipseArc( x, y, r0, r1, r0, r1, angle0, angle1); }
+                  void drawArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1)                 {                  drawEllipseArc( x, y, r0, r1, r0, r1, angle0, angle1); }
+    LGFX_INLINE_T void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1, const T& color) { setColor(color); fillEllipseArc( x, y, r0, r1, r0, r1, angle0, angle1); }
+                  void fillArc         ( std::int32_t x, std::int32_t y, std::int32_t r0, std::int32_t r1, float angle0, float angle1)                 {                  fillEllipseArc( x, y, r0, r1, r0, r1, angle0, angle1); }
     LGFX_INLINE_T void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername                 , const T& color)  { setColor(color); drawCircleHelper(x, y, r, cornername    ); }
                   void drawCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t cornername);
     LGFX_INLINE_T void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta, const T& color)  { setColor(color); fillCircleHelper(x, y, r, corners, delta); }
                   void fillCircleHelper( std::int32_t x, std::int32_t y, std::int32_t r, std::uint_fast8_t corners, std::int32_t delta);
-
     LGFX_INLINE_T void floodFill( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
                   void floodFill( std::int32_t x, std::int32_t y                );
     LGFX_INLINE_T void paint    ( std::int32_t x, std::int32_t y, const T& color) { setColor(color); floodFill(x, y); }
@@ -183,6 +188,32 @@ namespace lgfx
     LGFX_INLINE_T void pushPixels(T*                   data, std::int32_t len           ) { startWrite(); writePixels(data, len      ); endWrite(); }
     LGFX_INLINE   void pushPixels(const std::uint16_t* data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
     LGFX_INLINE   void pushPixels(const void*          data, std::int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
+
+    template<typename TFunc>
+    void effect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, TFunc&& effector)
+    {
+      if (!_clipping(x, y, w, h)) return;
+      auto ye = y + h;
+      RGBColor buf[w];
+      startWrite();
+      do
+      {
+        readRectRGB(x, y, w, 1, buf);
+        std::size_t i = 0;
+        do
+        {
+          effector(x + i, y, buf[i]);
+        } while (++i < w);
+        pushImage(x, y, w, 1, buf);
+      } while (++y < ye);
+      endWrite();
+    }
+
+    template<typename T>
+    void fillRectAlpha(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, std::uint8_t alpha, const T& color)
+    {
+      effect(x, y, w, h, effect_fill_alpha ( argb8888_t { convert_to_rgb888(color) | alpha << 24 } ) );
+    }
 
     LGFX_INLINE_T void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& color                    ) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(color)); }
     LGFX_INLINE_T void drawBitmap (std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_bitmap (x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
@@ -749,6 +780,23 @@ namespace lgfx
       return (dw <= 0);
     }
 
+    bool _clipping(std::int32_t& x, std::int32_t& y, std::int32_t& w, std::int32_t& h)
+    {
+      auto cl = _clip_l;
+      if (x < cl) { w += x - cl; x = cl; }
+      auto cr = _clip_r + 1 - x;
+      if (w > cr) w = cr;
+      if (w < 1) return false;
+
+      auto ct = _clip_t;
+      if (y < ct) { h += y - ct; y = ct; }
+      auto cb = _clip_b + 1 - y;
+      if (h > cb) h = cb;
+      if (h < 1) return false;
+
+      return true;
+    }
+
 //----------------------------------------------------------------------------
 
     template<typename T>
@@ -990,7 +1038,7 @@ namespace lgfx
 
     void read_rect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, void* dst, pixelcopy_t* param);
     void draw_gradient_line( std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, uint32_t colorstart, uint32_t colorend );
-    void fill_arc_helper(std::int32_t cx, std::int32_t cy, std::int32_t oradius, std::int32_t iradius, float start, float end);
+    void fill_arc_helper(std::int32_t cx, std::int32_t cy, std::int32_t oradius_x, std::int32_t iradius_x, std::int32_t oradius_y, std::int32_t iradius_y, float start, float end);
     void draw_bezier_helper(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2);
     void draw_bitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor = ~0u);
     void draw_xbitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor = ~0u);
@@ -1057,6 +1105,7 @@ namespace lgfx
     void init(void)               { init_impl(true , true); };
     void begin(void)              { init_impl(true , true); };
     void init_without_reset(void) { init_impl(false, false); };
+    void initBus(void);
 
     void setEpdMode(epd_mode_t epd_mode) { _panel->setEpdMode(epd_mode); }
     epd_mode_t getEpdMode(void) const { return _panel->getEpdMode(); }
@@ -1074,11 +1123,6 @@ namespace lgfx
     inline void panel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
     inline void setPanel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
 
-    inline ITouch* touch(void) const { return _touch; }
-    inline void touch(ITouch* touch) { _touch = touch; }
-    inline void setTouch(ITouch* touch) { _touch = touch; }
-
-
     inline void writeCommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // AdafruitGFX compatible
     inline void writecommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // TFT_eSPI compatible
     inline void writeCommand16(std::uint16_t cmd) { _panel->writeCommand(__builtin_bswap16(cmd), 2); }
@@ -1091,38 +1135,14 @@ namespace lgfx
     inline std::uint16_t readData16(std::uint8_t index=0) { return __builtin_bswap16(_panel->readData(index, 2)); }
     inline std::uint32_t readData32(std::uint8_t index=0) { return __builtin_bswap32(_panel->readData(index, 4)); }
 
-    inline void setBrightness(std::uint8_t brightness) { _brightness = brightness; _panel->setBrightness(brightness); }
+    inline ILight* light(void) const { return _panel ? panel()->light() : nullptr; }
+    inline void setBrightness(std::uint8_t brightness) { _brightness = brightness; if (_panel) { _panel->setBrightness(brightness); } }
     inline std::uint8_t getBrightness(void) const { return _brightness; }
 
-    std::uint_fast8_t getTouchRaw(touch_point_t *tp, std::uint_fast8_t number = 0)
-    {
-      if (_touch == nullptr) return 0;
-
-      bool need_transaction = (_touch->config().bus_shared && getStartCount());
-      if (need_transaction) { endTransaction(); }
-      auto res = _touch->getTouchRaw(tp, number);
-      if (need_transaction) { beginTransaction(); }
-      return res;
-    }
-
-    std::uint_fast8_t getTouch(touch_point_t *tp, std::uint_fast8_t number = 0)
-    {
-      if (_touch == nullptr) return 0;
-
-      bool need_transaction = (_touch->config().bus_shared && getStartCount());
-      if (need_transaction) { endTransaction(); }
-      auto res = _touch->getTouch(tp, number);
-      if (need_transaction) { beginTransaction(); }
-
-      std::uint_fast8_t r = getRotation();
-      if (r & 1) {
-        std::swap(tp->x, tp->y);
-      }
-      if (r & 2) tp->x = (width()-1) - tp->x;
-      if ((0 == ((r + 1) & 2)) != (0 == (r & 4))) tp->y = (height()-1) - tp->y;
-
-      return res;
-    }
+    inline ITouch* touch(void) const { return _panel ? panel()->touch() : nullptr; }
+    std::uint_fast8_t getTouchRaw(touch_point_t *tp, std::uint_fast8_t number = 0) { return panel()->getTouchRaw(tp, number); }
+    std::uint_fast8_t getTouch(touch_point_t *tp, std::uint_fast8_t number = 0) { return panel()->getTouch(tp, number); }
+    inline void convertRawXY(std::int32_t *x, std::int32_t *y) { panel()->convertRawXY(x, y); }
 
     touch_point_t getTouch(std::uint_fast8_t number = 0)
     {
@@ -1158,23 +1178,13 @@ namespace lgfx
       *y = ty;
     }
 
-    void convertRawXY(std::int32_t *x, std::int32_t *y)
-    {
-      std::uint_fast8_t r = getRotation();
-      if (r & 1) {
-        std::swap(x, y);
-      }
-      if (r & 2) *x = (width()-1) - *x;
-      if ((0 == ((r + 1) & 2)) != (0 == (r & 4))) *y = (height()-1) - *y;
-    }
-
     // This requires a uint16_t array with 8 elements. ( or nullptr )
     template <typename T>
     void calibrateTouch(uint16_t *parameters, const T& color_fg, const T& color_bg, uint8_t size = 10)
     {
       calibrate_touch(parameters, _write_conv.convert(color_fg), _write_conv.convert(color_bg), size);
     }
-
+/*
     void updateTouchCalibrate(void)
     {
       auto cfg = _touch->config();
@@ -1196,153 +1206,17 @@ namespace lgfx
       if (getRotation() & 1) std::swap(w, h);
       _touch->setCalibrate(parameters, w, h);
     }
+//*/
 
   protected:
-    ITouch* _touch = nullptr;
     std::uint8_t _brightness = 127;
 
     virtual void init_impl(bool use_reset, bool use_clear);
 
-    void draw_calibrate_point(std::int32_t x, std::int32_t y, std::int32_t r, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor)
-    {
-      setRawColor(bg_rawcolor);
-      fillRect(x - r, y - r, r * 2 + 1, r * 2 + 1);
-      if (fg_rawcolor == bg_rawcolor) return;
-      startWrite();
-      setRawColor(fg_rawcolor);
-      fillRect(x - 1, y - r, 3, r * 2 + 1);
-      fillRect(x - r, y - 1, r * 2 + 1, 3);
-      for (std::int32_t i = - r + 1; i < r; ++i) {
-        drawFastHLine(x + i - 1, y + i, 3);
-        drawFastHLine(x - i - 1, y + i, 3);
-      }
-      drawFastHLine(x + r - 1, y + r, 2);
-      drawFastHLine(x - r    , y + r, 2);
-      drawFastHLine(x - r    , y - r, 2);
-      drawFastHLine(x + r - 1, y - r, 2);
-      endWrite();
-    }
+    void draw_calibrate_point(std::int32_t x, std::int32_t y, std::int32_t r, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor);
 
-    void calibrate_touch(std::uint16_t *parameters, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor, std::uint8_t size)
-    {
-      if (nullptr == _touch) return;
-      auto rot = getRotation();
-      setRotation(0);
+    void calibrate_touch(std::uint16_t *parameters, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor, std::uint8_t size);
 
-      std::uint16_t orig[8];
-      for (int i = 0; i < 4; ++i) {
-        std::int32_t px = (width() -  1) * ((i>>1) & 1);
-        std::int32_t py = (height() - 1) * ( i     & 1);
-        draw_calibrate_point( px, py, size, fg_rawcolor, bg_rawcolor);
-        delay(500);
-        std::int32_t x_touch = 0, y_touch = 0;
-        static constexpr int _RAWERR = 20;
-        std::int32_t x_tmp, y_tmp, x_tmp2, y_tmp2;
-        for (int j = 0; j < 8; ++j) {
-          do {
-            do { delay(1); } while (!getTouchRaw(&x_tmp,&y_tmp));
-            delay(2); // Small delay to the next sample
-          } while (!getTouchRaw(&x_tmp2,&y_tmp2)
-                 || (abs(x_tmp - x_tmp2) > _RAWERR)
-                 || (abs(y_tmp - y_tmp2) > _RAWERR));
-
-          x_touch += x_tmp;
-          x_touch += x_tmp2;
-          y_touch += y_tmp;
-          y_touch += y_tmp2;
-        }
-        orig[i*2  ] = x_touch >> 4;
-        orig[i*2+1] = y_touch >> 4;
-        draw_calibrate_point( px, py, size, bg_rawcolor, bg_rawcolor);
-        while (getTouchRaw());
-      }
-      if (nullptr != parameters) {
-        memcpy(parameters, orig, sizeof(std::uint16_t) * 8);
-      }
-      _touch->setCalibrate(orig, width(), height());
-      //set_touch_calibrate(orig);
-      setRotation(rot);
-    }
-/*
-    void set_touch_calibrate(std::uint16_t *parameters)
-    {
-      std::uint32_t vect[6] = {0,0,0,0,0,0};
-      float mat[3][3] = {{0,0,0},{0,0,0},{0,0,0}};
-
-      bool r = getRotation() & 1;
-      std::int32_t w = r ? _height : _width;
-      std::int32_t h = r ? _width : _height;
-      --w;
-      --h;
-      float a;
-      for ( int i = 0; i < 4; ++i ) {
-        std::int32_t tx = w * ((i>>1) & 1);
-        std::int32_t ty = h * ( i     & 1);
-        std::int32_t px = parameters[i*2  ];
-        std::int32_t py = parameters[i*2+1];
-        a = px * px;
-        mat[0][0] += a;
-        a = px * py;
-        mat[0][1] += a;
-        mat[1][0] += a;
-        a = px;
-        mat[0][2] += a;
-        mat[2][0] += a;
-        a = py * py;
-        mat[1][1] += a;
-        a = py;
-        mat[1][2] += a;
-        mat[2][1] += a;
-        mat[2][2] += 1;
-
-        vect[0] += px * tx;
-        vect[1] += py * tx;
-        vect[2] +=      tx;
-        vect[3] += px * ty;
-        vect[4] += py * ty;
-        vect[5] +=      ty;
-      }
-
-      {
-        float det = 1;
-        for ( int k = 0; k < 3; ++k )
-        {
-          float t = mat[k][k];
-          det *= t;
-          for ( int i = 0; i < 3; ++i ) mat[k][i] /= t;
-
-          mat[k][k] = 1 / t;
-          for ( int j = 0; j < 3; ++j )
-          {
-            if ( j == k ) continue;
-
-            float u = mat[j][k];
-
-            for ( int i = 0; i < 3; ++i )
-            {
-              if ( i != k ) mat[j][i] -= mat[k][i] * u;
-              else mat[j][i] = -u / t;
-            }
-          }
-        }
-      }
-
-      float result[6];
-      float v0 = vect[0];
-      float v1 = vect[1];
-      float v2 = vect[2];
-      result[0] = mat[0][0] * v0 + mat[0][1] * v1 + mat[0][2] * v2;
-      result[1] = mat[1][0] * v0 + mat[1][1] * v1 + mat[1][2] * v2;
-      result[2] = mat[2][0] * v0 + mat[2][1] * v1 + mat[2][2] * v2;
-      float v3 = vect[3];
-      float v4 = vect[4];
-      float v5 = vect[5];
-      result[3] = mat[0][0] * v3 + mat[0][1] * v4 + mat[0][2] * v5;
-      result[4] = mat[1][0] * v3 + mat[1][1] * v4 + mat[1][2] * v5;
-      result[5] = mat[2][0] * v3 + mat[2][1] * v4 + mat[2][2] * v5;
-      _touch->setCalibrateAffine(result);
-    }
-//*/
 //----------------------------------------------------------------------------
 
   };
@@ -1350,3 +1224,6 @@ namespace lgfx
 //----------------------------------------------------------------------------
  }
 }
+
+using LovyanGFX = lgfx::LovyanGFX;
+using LGFX_Device = lgfx::LGFX_Device;

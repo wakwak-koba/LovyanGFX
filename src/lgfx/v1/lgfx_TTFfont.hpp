@@ -26,11 +26,14 @@ namespace lgfx
 
     bool updateFontMetric(FontMetrics *metrics, std::uint16_t uniCode) const override;
 
-    bool getUnicodeIndex(std::uint16_t unicode, std::uint16_t *index) const;
-
   private:
 
+    bool _get_glyph_index(std::uint16_t unicode, std::uint16_t *index) const;
+
     bool tt_face_build_cmaps( void );
+
+#pragma pack(push)
+#pragma pack(1)
 
     struct TTC_HeaderRec
     {
@@ -107,12 +110,12 @@ namespace lgfx
 
     struct TT_HoriHeader
     {
+      std::int32_t Version;
+      std::int16_t Ascender;
+      std::int16_t Descender;
+      std::int16_t Line_Gap;
       union
       {
-        std::int32_t Version;
-        std::int16_t Ascender;
-        std::int16_t Descender;
-        std::int16_t Line_Gap;
         struct
         {
           std::uint16_t advance_Width_Max;      /* advance width maximum */
@@ -190,6 +193,7 @@ namespace lgfx
 
       void load(DataWrapper* data);
     };
+
     struct cmap_t  // 自作
     {
       std::uint16_t* rawdata = nullptr;
@@ -240,6 +244,16 @@ namespace lgfx
       std::uint16_t encoding_id;
     };
 
+    struct Metrics_t
+    {
+      std::int16_t  left_bearing   = 0;
+      std::int16_t  top_bearing    = 0;
+      std::uint16_t advance_width  = 0;
+      std::uint16_t advance_height = 0;
+    };
+
+#pragma pack(pop)
+
     SFNT_HeaderRec _sfnt;
     TT_Header     _header;
     TT_HoriHeader _horizontal;   /* TrueType horizontal header     */
@@ -258,10 +272,13 @@ namespace lgfx
     std::uint32_t _vert_metrics_size;
     std::uint32_t _vert_metrics_offset;
 
+
     TT_TableRec* tt_face_lookup_table(std::uint32_t tag);
     bool tt_face_goto_table( std::uint32_t tag
                             , DataWrapper* data
                             , std::uint32_t* length = nullptr);
+
+    Metrics_t _get_metrics(std::uint32_t glyph_index) const;
 
     std::uint_fast8_t face_index = 0;
   };

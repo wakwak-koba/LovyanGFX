@@ -71,34 +71,41 @@ namespace lgfx
     _panel_height = h;
     _ye = h - 1;
 
-    setRotation(getRotation());    
+    setRotation(_rotation);
   }
 
   void Panel_Sprite::deleteSprite(void)
   {
-    _bitwidth = _panel_width = _panel_height = 0;
-    setRotation(getRotation());
+    _bitwidth = _panel_width = _panel_height = _width = _height = 0;
+    setRotation(_rotation);
     _img.release();
   }
 
   void* Panel_Sprite::createSprite(std::int32_t w, std::int32_t h, color_conv_t* conv, bool psram)
   {
-    if (w < 1 || h < 1) return nullptr;
-    _panel_width = w;
-    _panel_height = h;
-    _bitwidth = (w + conv->x_mask) & (~(std::uint32_t)conv->x_mask);
-    std::size_t len = h * (_bitwidth * _write_bits >> 3) + 1;
-
-    _img.reset(len, psram ? AllocationSource::Psram : AllocationSource::Dma);
-
-    if (!_img)
+    if (w < 1 || h < 1)
     {
       deleteSprite();
       return nullptr;
     }
-    memset(_img, 0, len);
+    if (!_img || (std::uint_fast16_t)w != _panel_width || (std::uint_fast16_t)h != _panel_height)
+    {
+      _panel_width = w;
+      _panel_height = h;
+      _bitwidth = (w + conv->x_mask) & (~(std::uint32_t)conv->x_mask);
+      std::size_t len = h * (_bitwidth * _write_bits >> 3) + 1;
 
-    setRotation(getRotation());
+      _img.reset(len, psram ? AllocationSource::Psram : AllocationSource::Dma);
+
+      if (!_img)
+      {
+        deleteSprite();
+        return nullptr;
+      }
+    }
+    memset(_img, 0, (_bitwidth * _write_bits >> 3) * _panel_height);
+
+    setRotation(_rotation);
 
     return _img;
   }
@@ -124,10 +131,18 @@ namespace lgfx
     }
     _width  = pw;
     _height = ph;
+    _xe = pw-1;
+    _ye = ph-1;
+    _xs = 0;
+    _ys = 0;
   }
 
   void Panel_Sprite::setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye)
   {
+    xs = std::max(0u, std::min<std::uint_fast16_t>(_width  - 1, xs));
+    xe = std::max(0u, std::min<std::uint_fast16_t>(_width  - 1, xe));
+    ys = std::max(0u, std::min<std::uint_fast16_t>(_height - 1, ys));
+    ye = std::max(0u, std::min<std::uint_fast16_t>(_height - 1, ye));
     _xpos = xs;
     _xs = xs;
     _xe = xe;
@@ -138,18 +153,17 @@ namespace lgfx
 
   void Panel_Sprite::drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor)
   {
-    auto bits = _write_bits;
-    if (_rotation)
+    std::uint_fast8_t r = _rotation;
+    if (r)
     {
-      auto r = _rotation;
-      if (r & 4)     { y = _height - (y + 1); }
-      if (r & 1)     { std::swap(x, y);     }
-      if ((r+1) & 2) { x = _panel_width  - (x + 1); }
-      if (r     & 2) { y = _panel_height - (y + 1); }
+      if ((1u << r) & 0b10010110) { y = _height - (y + 1); }
+      if (r & 2)                  { x = _width  - (x + 1); }
+      if (r & 1) { std::swap(x, y); }
     }
+    auto bits = _write_bits;
+    std::uint32_t index = x + y * _bitwidth;
     if (bits >= 8)
     {
-      std::uint32_t index = x + y * _bitwidth;
       if (bits == 8)
       {
         _img.img8()[index] = rawcolor;
@@ -165,7 +179,7 @@ namespace lgfx
     }
     else
     {
-      std::uint32_t index = (x + y * _bitwidth) * bits;
+      index *= bits;
       std::uint8_t* dst = &_img.img8()[index >> 3];
       std::uint8_t mask = (std::uint8_t)(~(0xFF >> bits)) >> (index & 7);
       *dst = (*dst & ~mask) | (rawcolor & mask);
@@ -174,41 +188,18 @@ namespace lgfx
 
   void Panel_Sprite::writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor)
   {
-    if (_rotation)
+    std::uint_fast8_t r = _rotation;
+    if (r)
     {
-      auto r = _rotation;
-      if (r & 4)     { y = _height - (y + h); }
-      if (r & 1)     { std::swap(x, y);  std::swap(w, h); }
-      if ((r+1) & 2) { x = _panel_width  - (x + w); }
-      if (r     & 2) { y = _panel_height - (y + h); }
+      if ((1u << r) & 0b10010110) { y = _height - (y + h); }
+      if (r & 2)                  { x = _width  - (x + w); }
+      if (r & 1) { std::swap(x, y);  std::swap(w, h); }
     }
 
     std::uint_fast8_t bits = _write_bits;
     if (bits >= 8)
     {
-      if (w == 1)
-      {
-        std::uint_fast16_t bw = _bitwidth;
-        std::uint32_t index = x + y * bw;
-        if (bits == 8)
-        {
-          auto img = &_img[index];
-          do { *img = rawcolor;  img += bw; } while (--h);
-        }
-        else if (bits == 16)
-        {
-          auto img = &_img.img16()[index];
-          do { *img = rawcolor;  img += bw; } while (--h);
-        }
-        else
-        {  // if (_write_conv.bytes == 3)
-          //auto c = _color;
-          auto img = &_img.img24()[index];
-          do { *img = rawcolor; img += bw; } while (--h);
-          //do { img->r = c.raw0; img->g = c.raw1; img->b = c.raw2; img += bw; } while (--h);
-        }
-      }
-      else
+      if (w > 1)
       {
         std::uint_fast8_t bytes = bits >> 3;
         std::uint32_t bw = _bitwidth;
@@ -234,12 +225,14 @@ namespace lgfx
         {
           std::size_t len = w * bytes;
           std::uint32_t add_dst = bw * bytes;
-          if (_img.use_memcpy())
+
+          if (_img.use_memcpy() && (w == bw || h == 1))
           {
-            if (w == bw)
+//          if (w == bw)
             {
               memset_multi(dst, rawcolor, bytes, w * h);
             }
+/*
             else
             {
               memset_multi(dst, rawcolor, bytes, w);
@@ -249,6 +242,7 @@ namespace lgfx
                 dst += add_dst;
               }
             }
+//*/
           }
           else
           {
@@ -260,6 +254,28 @@ namespace lgfx
               dst += add_dst;
             } while (--h);
           }
+        }
+      }
+      else
+      {
+        std::uint_fast16_t bw = _bitwidth;
+        std::uint32_t index = x + y * bw;
+        if (bits == 8)
+        {
+          auto img = &_img[index];
+          do { *img = rawcolor;  img += bw; } while (--h);
+        }
+        else if (bits == 16)
+        {
+          auto img = &_img.img16()[index];
+          do { *img = rawcolor;  img += bw; } while (--h);
+        }
+        else
+        {  // if (_write_conv.bytes == 3)
+          //auto c = _color;
+          auto img = &_img.img24()[index];
+          do { *img = rawcolor; img += bw; } while (--h);
+          //do { img->r = c.raw0; img->g = c.raw1; img->b = c.raw2; img += bw; } while (--h);
         }
       }
     }
@@ -318,15 +334,51 @@ namespace lgfx
     } while (length);
   }
 
+  void Panel_Sprite::_rotate_pixelcopy(std::uint_fast16_t& x, std::uint_fast16_t& y, std::uint_fast16_t& w, std::uint_fast16_t& h, pixelcopy_t* param, std::uint32_t& nextx, std::uint32_t& nexty)
+  {
+    std::uint32_t addx = param->src_x32_add;
+    std::uint32_t addy = param->src_y32_add;
+    std::uint_fast8_t r = _rotation;
+    std::uint_fast8_t bitr = 1u << r;
+    // if (bitr & 0b10011100)
+    // {
+    //   nextx = -nextx;
+    // }
+    if (bitr & 0b10010110) // case 1:2:4:7:
+    {
+      param->src_y32 += nexty * (h - 1);
+      nexty = -nexty;
+      y = _height - (y + h);
+    }
+    if (r & 2)
+    {
+      param->src_x32 += addx * (w - 1);
+      param->src_y32 += addy * (w - 1);
+      addx = -addx;
+      addy = -addy;
+      x = _width  - (x + w);
+    }
+    if (r & 1)
+    {
+      std::swap(x, y);
+      std::swap(w, h);
+      std::swap(nextx, addx);
+      std::swap(nexty, addy);
+    }
+    param->src_x32_add = addx;
+    param->src_y32_add = addy;
+  }
+
   void Panel_Sprite::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool)
   {
-    if (_rotation == 0 && param->transp == ~0u && param->no_convert && _img.use_memcpy())
+    std::uint_fast8_t r = _rotation;
+    if (r == 0 && param->transp == ~0u && param->no_convert && _img.use_memcpy())
     {
       auto sx = param->src_x;
       auto bits = param->src_bits;
       std::uint_fast8_t mask = (bits == 1) ? 7
-                              : (bits == 2) ? 3
-                                            : 1;
+                             : (bits == 2) ? 3
+                                           : 1;
       if (0 == (bits & 7) || ((sx & mask) == (x & mask) && (w == this->_panel_width || 0 == (w & mask))))
       {
         auto bw = _bitwidth * bits >> 3;
@@ -350,76 +402,39 @@ namespace lgfx
       }
     }
 
+    std::uint32_t nextx = 0;
+    std::uint32_t nexty = 1 << pixelcopy_t::FP_SCALE;
+    if (r)
+    {
+      _rotate_pixelcopy(x, y, w, h, param, nextx, nexty);
+    }
     std::uint32_t sx32 = param->src_x32;
-    std::uint32_t y_add = _bitwidth;
-    auto r = _rotation;
-    if (0 == (r & 1))
+    std::uint32_t sy32 = param->src_y32;
+
+    y *= _bitwidth;
+    do
     {
-      if (r)
-      {
-        if (r == 2 || r == 4)
-        {
-          y = _height - (y + 1); 
-          y_add = -y_add;
-        }
-        if ((r&3) == 2)
-        {
-          x = _panel_width  - (x + w); 
-          sx32 = sx32 + param->src_x32_add * (w - 1);
-          param->src_x32 = sx32;
-          param->src_y32 += param->src_y32_add * (w - 1);
-          param->src_x32_add = - param->src_x32_add;
-          param->src_y32_add = - param->src_y32_add;
-        }
-      }
-      y *= _bitwidth;
-      do
-      {
-        std::int32_t pos = x + y;
-        std::int32_t end = pos + w;
-        y += y_add;
-        while (end != (pos = param->fp_copy(_img, pos, end, param))
-          &&  end != (pos = param->fp_skip(      pos, end, param)));
-        param->src_x32 = sx32;
-        param->src_y += 1;
-      } while (--h);
-    }
-    else
-    {
-      std::swap(x, y);
-      std::uint32_t x_add = 1;
-      if (r != 5)
-      {
-        if (3 != r)
-        {
-          x_add = -1;
-          x = _panel_width  - (x + 1); 
-        }
-        if (1 != r)
-        {
-          y_add = -y_add;
-          y = _panel_height - (y + 1); 
-        }
-      }
-      do
-      {
-        auto loop = w;
-        auto ty = y * _bitwidth;
-        do
-        {
-          std::int32_t pos = x + ty;
-          param->fp_copy(_img, pos, pos + 1, param);
-          ty += y_add;
-        } while (--loop);
-        param->src_x32 = sx32;
-        param->src_y += 1;
-        x += x_add;
-      } while (--h);
-    }
+      std::int32_t pos = x + y;
+      std::int32_t end = pos + w;
+      while (end != (pos = param->fp_copy(_img, pos, end, param))
+         &&  end != (pos = param->fp_skip(      pos, end, param)));
+      param->src_x32 = (sx32 += nextx);
+      param->src_y32 = (sy32 += nexty);
+      y += _bitwidth;
+    } while (--h);
   }
 
   void Panel_Sprite::writeImageARGB(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param)
   {
+    std::uint32_t nextx = 0;
+    std::uint32_t nexty = 1 << pixelcopy_t::FP_SCALE;
+    if (_rotation)
+    {
+      _rotate_pixelcopy(x, y, w, h, param, nextx, nexty);
+    }
+    std::uint32_t sx32 = param->src_x32;
+    std::uint32_t sy32 = param->src_y32;
+
     std::uint32_t pos = x + y * _bitwidth;
     std::uint32_t end = pos + w;
     param->fp_copy(_img, pos, end, param);
@@ -427,17 +442,48 @@ namespace lgfx
     {
       pos += _bitwidth;
       end = pos + w;
-      param->src_y++;
+      param->src_x32 = (sx32 += nextx);
+      param->src_y32 = (sy32 += nexty);
       param->fp_copy(_img, pos, end, param);
     }
   }
 
+  std::uint32_t Panel_Sprite::readPixelValue(std::uint_fast16_t x, std::uint_fast16_t y)
+  {
+    std::uint_fast8_t r = _rotation;
+    if (r)
+    {
+      if ((1u << r) & 0b10010110) { y = _height - (y + 1); }
+      if (r & 2)                  { x = _width  - (x + 1); }
+      if (r & 1) { std::swap(x, y); }
+    }
+
+    if (x >= _panel_width || y >= _panel_height) return 0;
+    std::size_t index = x + y * _bitwidth;
+    auto bits = _read_bits;
+    if (bits >= 8)
+    {
+      if (bits == 8)
+      {
+        return _img.img8()[index];
+      }
+      else if (bits == 16)
+      {
+        return _img.img16()[index];
+      }
+      return (std::uint32_t)_img.img24()[index];
+    }
+    index *= bits;
+    std::uint8_t mask = (1 << bits) - 1;
+    return (_img.img8()[index >> 3] >> (-(index + bits) & 7)) & mask;
+  }
 
   void Panel_Sprite::readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param)
   {
-    h += y;
-    if (param->no_convert && _write_bits >= 8)
+    std::uint_fast8_t r = _rotation;
+    if (0 == r && param->no_convert && _write_bits >= 8)
     {
+      h += y;
       auto bytes = _write_bits >> 3;
       auto bw = _bitwidth;
       auto d = (std::uint8_t*)dst;
@@ -445,28 +491,65 @@ namespace lgfx
         memcpy(d, &_img[(x + y * bw) * bytes], w * bytes);
         d += w * bytes;
       } while (++y != h);
-    } else {
+    }
+    else
+    {
       param->src_bitwidth = _bitwidth;
       param->src_data = _img;
-      std::int32_t dstindex = 0;
-      do {
-        param->src_x = x;
-        param->src_y = y;
+      std::uint32_t nextx = 0;
+      std::uint32_t nexty = 1 << pixelcopy_t::FP_SCALE;
+      if (r)
+      {
+        std::uint32_t addx = param->src_x32_add;
+        std::uint32_t addy = param->src_y32_add;
+        std::uint_fast8_t rb = 1 << r;
+        if (rb & 0b10010110) // case 1:2:4:7:
+        {
+          nexty = -nexty;
+          y = _height - (y + 1);
+        }
+        if (r & 2)
+        {
+          addx = -addx;
+          x = _width - (x + 1);
+        }
+        if ((r+1) & 2)
+        {
+          addy  = -addy;
+        }
+        if (r & 1)
+        {
+          std::swap(x, y);
+          std::swap(addx, addy);
+          std::swap(nextx, nexty);
+        }
+        param->src_x32_add = addx;
+        param->src_y32_add = addy;
+      }
+      std::size_t dstindex = 0;
+      std::uint32_t x32 = x << pixelcopy_t::FP_SCALE;
+      std::uint32_t y32 = y << pixelcopy_t::FP_SCALE;
+      param->src_x32 = x32;
+      param->src_y32 = y32;
+      do
+      {
+        param->src_x32 = x32;
+        x32 += nextx;
+        param->src_y32 = y32;
+        y32 += nexty;
         dstindex = param->fp_copy(dst, dstindex, dstindex + w, param);
-      } while (++y != h);
+      } while (--h);
     }
   }
 
-
   void Panel_Sprite::copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y)
   {
-    auto r = _rotation;
+    std::uint_fast8_t r = _rotation;
     if (r)
     {
-      if (r & 4)     { src_y = _height - (src_y + h); dst_y = _height - (dst_y + h); }
-      if (r & 1)     { std::swap(src_x, src_y);  std::swap(dst_x, dst_y);  std::swap(w, h); }
-      if ((r+1) & 2) { src_x = _panel_width  - (src_x + w); dst_x = _panel_width  - (dst_x + w); }
-      if (r     & 2) { src_y = _panel_height - (src_y + h); dst_y = _panel_height - (dst_y + h); }
+      if ((1u << r) & 0b10010110) { src_y = _height - (src_y + h); dst_y = _height - (dst_y + h); }
+      if (r & 2)                  { src_x = _width  - (src_x + w); dst_x = _width  - (dst_x + w); }
+      if (r & 1) { std::swap(src_x, src_y);  std::swap(dst_x, dst_y);  std::swap(w, h); }
     }
 
     if (_write_bits < 8) {

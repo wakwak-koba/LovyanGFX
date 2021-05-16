@@ -202,7 +202,7 @@ namespace lgfx
     return (!(*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE));
   }
 
-  void Bus_Parallel8::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
+  bool Bus_Parallel8::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
     bit_length = (bit_length + 7) >> 3;
     wait_i2s();
@@ -219,6 +219,7 @@ namespace lgfx
       *_i2s_fifo_wr_reg = (data & 0xFF) << 16;
     }
     *_i2s_conf_reg = _conf_reg_start;
+    return true;
   }
 
   void Bus_Parallel8::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
@@ -586,7 +587,7 @@ namespace lgfx
     return res;
   }
 
-  void Bus_Parallel8::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
+  bool Bus_Parallel8::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
   {
     do {
       std::uint32_t tmp = GPIO.in;   // dummy read speed tweak.
@@ -595,12 +596,13 @@ namespace lgfx
       gpio_lo(_cfg.pin_rd);
       *dst++ = _reg_to_value(tmp);
     } while (--length);
+    return true;
   }
 
   void Bus_Parallel8::readPixels(void* dst, pixelcopy_t* param, std::uint32_t length)
   {
     std::uint32_t _regbuf[8];
-    const auto bytes = param->dst_bits >> 3;
+    const auto bytes = param->src_bits >> 3;
     std::uint32_t limit = (bytes == 2) ? 16 : 10;
     param->src_data = _regbuf;
     std::int32_t dstindex = 0;

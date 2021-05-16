@@ -111,42 +111,7 @@ namespace lgfx
  inline namespace v1
  {
 //----------------------------------------------------------------------------
-
-  static constexpr struct {
-    std::uintptr_t sercomPtr;
-    std::uint8_t   id_core;
-    std::uint8_t   id_slow;
-    IRQn_Type irq[4];
-    int       dmac_id_tx;
-    int       dmac_id_rx;
-  } sercomData[] = {
-    { 0x40003000UL, SERCOM0_GCLK_ID_CORE, SERCOM0_GCLK_ID_SLOW, SERCOM0_0_IRQn, SERCOM0_1_IRQn, SERCOM0_2_IRQn, SERCOM0_3_IRQn, SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX },
-    { 0x40003400UL, SERCOM1_GCLK_ID_CORE, SERCOM1_GCLK_ID_SLOW, SERCOM1_0_IRQn, SERCOM1_1_IRQn, SERCOM1_2_IRQn, SERCOM1_3_IRQn, SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX },
-    { 0x41012000UL, SERCOM2_GCLK_ID_CORE, SERCOM2_GCLK_ID_SLOW, SERCOM2_0_IRQn, SERCOM2_1_IRQn, SERCOM2_2_IRQn, SERCOM2_3_IRQn, SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX },
-    { 0x41014000UL, SERCOM3_GCLK_ID_CORE, SERCOM3_GCLK_ID_SLOW, SERCOM3_0_IRQn, SERCOM3_1_IRQn, SERCOM3_2_IRQn, SERCOM3_3_IRQn, SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX },
-    { 0x43000000UL, SERCOM4_GCLK_ID_CORE, SERCOM4_GCLK_ID_SLOW, SERCOM4_0_IRQn, SERCOM4_1_IRQn, SERCOM4_2_IRQn, SERCOM4_3_IRQn, SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX },
-    { 0x43000400UL, SERCOM5_GCLK_ID_CORE, SERCOM5_GCLK_ID_SLOW, SERCOM5_0_IRQn, SERCOM5_1_IRQn, SERCOM5_2_IRQn, SERCOM5_3_IRQn, SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX },
-  #if defined(SERCOM6)
-    { 0x43000800UL, SERCOM6_GCLK_ID_CORE, SERCOM6_GCLK_ID_SLOW, SERCOM6_0_IRQn, SERCOM6_1_IRQn, SERCOM6_2_IRQn, SERCOM6_3_IRQn, SERCOM6_DMAC_ID_TX, SERCOM6_DMAC_ID_RX },
-  #endif
-  #if defined(SERCOM7)
-    { 0x43000C00UL, SERCOM7_GCLK_ID_CORE, SERCOM7_GCLK_ID_SLOW, SERCOM7_0_IRQn, SERCOM7_1_IRQn, SERCOM7_2_IRQn, SERCOM7_3_IRQn, SERCOM7_DMAC_ID_TX, SERCOM7_DMAC_ID_RX },
-  #endif
-  };
-
-
-
-  void Bus_SPI::resetSPI(void)
-  {
-    auto *spi = &_sercom->SPI;
-
-    //Setting the Software Reset bit to 1
-    spi->CTRLA.bit.SWRST = 1;
-
-    //Wait both bits Software Reset from CTRLA and SYNCBUSY are equal to 0
-    while (spi->CTRLA.bit.SWRST || spi->SYNCBUSY.bit.SWRST);
-  }
-
+/*
   void Bus_SPI::enableSPI(void)
   {
     auto *spi = &_sercom->SPI;
@@ -158,7 +123,7 @@ namespace lgfx
       //Waiting then enable bit from SYNCBUSY is equal to 0;
     while (spi->SYNCBUSY.bit.ENABLE);
   }
-
+//*/
   std::uint32_t Bus_SPI::FreqToClockDiv(std::uint32_t freq)
   {
     std::uint32_t div = _cfg.sercom_clkfreq / (1+(freq<<1));
@@ -177,32 +142,18 @@ namespace lgfx
     while (spi->SYNCBUSY.reg);
   }
 
-  static void pinAssignSercom(int cfgport, int type = 3)
-  {
-    std::uint_fast8_t port = (cfgport >> samd51::PORT_SHIFT) & 0xFF;
-    std::uint_fast8_t pin = cfgport & 0xFF;
-    std::uint32_t temp = PORT->Group[port].PMUX[pin >> 1].reg;
-
-    if (pin&1) temp = PORT_PMUX_PMUXO( type ) | (temp & PORT_PMUX_PMUXE( 0xF ));
-    else       temp = PORT_PMUX_PMUXE( type ) | (temp & PORT_PMUX_PMUXO( 0xF ));
-    PORT->Group[port].PMUX[pin >> 1].reg = temp ;
-    PORT->Group[port].PINCFG[pin].reg |= PORT_PINCFG_PMUXEN | PORT_PINCFG_DRVSTR;
-  }
-
-
-
   void Bus_SPI::config(const config_t& config)
   {
     _cfg = config;
 
     _need_wait = false;
-    _sercom = reinterpret_cast<Sercom*>(sercomData[_cfg.sercom_index].sercomPtr);
+    _sercom = reinterpret_cast<Sercom*>(samd51::getSercomData(_cfg.sercom_index)->sercomPtr);
     _last_apb_freq = -1;
     _mask_reg_dc = 0;
     std::uint32_t port = 0;
     if (_cfg.pin_dc >= 0)
     {
-      _mask_reg_dc = (1ul << (_cfg.pin_dc & 0xFF));
+      _mask_reg_dc = (1ul << (_cfg.pin_dc & (samd51::PIN_MASK)));
       port = _cfg.pin_dc >> samd51::PORT_SHIFT;
     }
 
@@ -219,44 +170,14 @@ namespace lgfx
     while (spi->SYNCBUSY.bit.ENABLE); //Waiting then enable bit from SYNCBUSY is equal to 0;
     spi->CTRLA.bit.ENABLE = 0;        //Setting the enable bit to 0
 
-    if (-1 != _cfg.pin_miso) pinAssignSercom(_cfg.pin_miso);
-    if (-1 != _cfg.pin_mosi) pinAssignSercom(_cfg.pin_mosi);
-    if (-1 != _cfg.pin_sclk) pinAssignSercom(_cfg.pin_sclk);
+    lgfx::spi::init(_cfg.sercom_index, _cfg.pin_sclk, _cfg.pin_miso, _cfg.pin_mosi);
 
-    resetSPI();
+    auto sercom_data = samd51::getSercomData(_cfg.sercom_index);
 
-//      std::int8_t idx = CFG::sercom_index;
-//      for(std::uint8_t i=0; i<4; i++) {
-//        NVIC_ClearPendingIRQ(sercomData[idx].irq[i]);
-//        NVIC_SetPriority(sercomData[idx].irq[i], SERCOM_NVIC_PRIORITY);
-//        NVIC_EnableIRQ(sercomData[idx].irq[i]);
-//      }
-
-#if defined(__SAMD51__)
-auto mastermode = SERCOM_SPI_CTRLA_MODE(0x3);
-#else
-auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
-#endif
-    SercomDataOrder dataOrder = MSB_FIRST;
-
-    //Setting the CTRLA register
-    spi->CTRLA.reg = mastermode
-                    | SERCOM_SPI_CTRLA_DOPO(_cfg.pad_mosi)
-                    | SERCOM_SPI_CTRLA_DIPO(_cfg.pad_miso)
-                    | dataOrder << SERCOM_SPI_CTRLA_DORD_Pos;
-
-    //Setting the CTRLB register
-    spi->CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(SPI_CHAR_SIZE_8_BITS)
-                    | SERCOM_SPI_CTRLB_RXEN; //Active the SPI receiver.
-
-    while( spi->SYNCBUSY.bit.CTRLB == 1 );
-
-    _clkdiv_read  = FreqToClockDiv(_cfg.freq_read);
-    _clkdiv_write = FreqToClockDiv(_cfg.freq_write);
-
-    if (_cfg.sercom_clksrc >= 0) {
-      std::uint8_t id_core = sercomData[_cfg.sercom_index].id_core;
-      std::uint8_t id_slow = sercomData[_cfg.sercom_index].id_slow;
+    if (_cfg.sercom_clksrc >= 0)
+    {
+      std::uint8_t id_core = sercom_data->id_core;
+      std::uint8_t id_slow = sercom_data->id_slow;
 
       GCLK->PCHCTRL[id_core].bit.CHEN = 0;     // Disable timer
       GCLK->PCHCTRL[id_slow].bit.CHEN = 0;     // Disable timer
@@ -270,15 +191,19 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
 
       while (!GCLK->PCHCTRL[id_core].bit.CHEN || !GCLK->PCHCTRL[id_slow].bit.CHEN);  // Wait for clock enable
     }
-    spi->BAUD.reg = _clkdiv_write;
+//    spi->BAUD.reg = _clkdiv_write;
 
     spi->CTRLA.bit.ENABLE = 1;         //Setting the enable bit to 1
-    _need_wait = false;
     while (spi->SYNCBUSY.bit.ENABLE);  //Waiting then enable bit from SYNCBUSY is equal to 0;
+
+    _need_wait = false;
+
+    _clkdiv_read  = FreqToClockDiv(_cfg.freq_read);
+    _clkdiv_write = FreqToClockDiv(_cfg.freq_write);
 
 #if defined (ARDUINO)
     _dma_adafruit.allocate();
-    _dma_adafruit.setTrigger(sercomData[_cfg.sercom_index].dmac_id_tx);
+    _dma_adafruit.setTrigger(sercom_data->dmac_id_tx);
     _dma_adafruit.setAction(DMA_TRIGGER_ACTON_BEAT);
     _dma_adafruit.setCallback(dmaCallback);
     _dma_write_desc = _dma_adafruit.addDescriptor(nullptr, (void*)&spi->DATA.reg);
@@ -352,6 +277,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
 
   void Bus_SPI::release(void)
   {
+    lgfx::spi::release(_cfg.sercom_index);
   }
 
   void Bus_SPI::beginTransaction(void)
@@ -376,7 +302,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
     return _need_wait && (_sercom->SPI.INTFLAG.bit.TXC == 0);
   }
 
-  void Bus_SPI::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
+  bool Bus_SPI::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
     auto *spi = &_sercom->SPI;
     dc_control(false);
@@ -385,18 +311,19 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
       spi->LENGTH.reg = 1 | SERCOM_SPI_LENGTH_LENEN;
       spi->DATA.reg = data;
       _need_wait = true;
-    } else {
-      if (!_sercom->SPI.CTRLC.bit.DATA32B) {
-        while (spi->SYNCBUSY.reg);
-        spi->CTRLA.bit.ENABLE = 0;
-        spi->CTRLC.bit.DATA32B = 1;  // 4Byte transfer enable
-        spi->CTRLA.bit.ENABLE = 1;
-        while (spi->SYNCBUSY.reg);
-      }
-      spi->LENGTH.reg = 2 | SERCOM_SPI_LENGTH_LENEN;
-      spi->DATA.reg = data << 8;
-      _need_wait = true;
+      return true;
     }
+    if (!_sercom->SPI.CTRLC.bit.DATA32B) {
+      while (spi->SYNCBUSY.reg);
+      spi->CTRLA.bit.ENABLE = 0;
+      spi->CTRLC.bit.DATA32B = 1;  // 4Byte transfer enable
+      spi->CTRLA.bit.ENABLE = 1;
+      while (spi->SYNCBUSY.reg);
+    }
+    spi->LENGTH.reg = 2 | SERCOM_SPI_LENGTH_LENEN;
+    spi->DATA.reg = data << 8;
+    _need_wait = true;
+    return true;
   }
 
   void Bus_SPI::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
@@ -595,7 +522,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
     return _sercom->SPI.DATA.reg;
   }
 
-  void Bus_SPI::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
+  bool Bus_SPI::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
   {
 /*
       if (use_dma && length > 16) {
@@ -664,6 +591,7 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
       dst += len2;
     } while (length);
     _need_wait = false;
+    return true;
   }
 
   void Bus_SPI::readPixels(void* dst, pixelcopy_t* param, std::uint32_t length)

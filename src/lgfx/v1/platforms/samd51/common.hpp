@@ -59,21 +59,30 @@ namespace lgfx
 
   namespace samd51
   {
-    static constexpr int PORT_SHIFT = 8;
+    static constexpr int PORT_SHIFT = 5;
+    static constexpr int PIN_MASK = (1 << PORT_SHIFT) - 1;
     enum pin_port
     {
       PORT_A =  0 << PORT_SHIFT,
       PORT_B =  1 << PORT_SHIFT,
       PORT_C =  2 << PORT_SHIFT,
       PORT_D =  3 << PORT_SHIFT,
-      PORT_E =  4 << PORT_SHIFT,
-      PORT_F =  5 << PORT_SHIFT,
-      PORT_G =  6 << PORT_SHIFT,
-      PORT_H =  7 << PORT_SHIFT,
     };
+
+    struct sercom_data_t
+    {
+      std::uintptr_t sercomPtr;
+      std::uint8_t   id_core;
+      std::uint8_t   id_slow;
+      IRQn_Type irq[4];
+      int       dmac_id_tx;
+      int       dmac_id_rx;
+    };
+    const sercom_data_t* getSercomData(std::size_t sercom_number);
   }
 
-  #if defined ( ARDUINO )
+#if defined ( ARDUINO )
+
   __attribute__ ((unused))
   static inline unsigned long millis(void)
   {
@@ -94,7 +103,9 @@ namespace lgfx
   {
     ::delayMicroseconds(us);
   }
-  #else
+
+#else
+
   static inline void delay(std::size_t milliseconds)
   {
     vTaskDelay(pdMS_TO_TICKS(milliseconds));
@@ -116,16 +127,17 @@ namespace lgfx
         return;
     }
   }
-  #endif
+
+#endif
 
   static inline void* heap_alloc(      size_t length) { return malloc(length); }
   static inline void* heap_alloc_psram(size_t length) { return malloc(length); }
   static inline void* heap_alloc_dma(  size_t length) { return memalign(16, length); }
   static inline void heap_free(void* buf) { free(buf); }
 
-  static inline void gpio_hi(std::uint32_t pin) { PORT->Group[pin>>8].OUTSET.reg = (1ul << (pin & 0xFF)); }
-  static inline void gpio_lo(std::uint32_t pin) { PORT->Group[pin>>8].OUTCLR.reg = (1ul << (pin & 0xFF)); }
-  static inline bool gpio_in(std::uint32_t pin) { return PORT->Group[pin>>8].IN.reg & (1ul << (pin & 0xFF)); }
+  static inline void gpio_hi(std::uint32_t pin) {        PORT->Group[pin >> samd51::PORT_SHIFT].OUTSET.reg = (1ul << (pin & samd51::PIN_MASK)); }
+  static inline void gpio_lo(std::uint32_t pin) {        PORT->Group[pin >> samd51::PORT_SHIFT].OUTCLR.reg = (1ul << (pin & samd51::PIN_MASK)); }
+  static inline bool gpio_in(std::uint32_t pin) { return PORT->Group[pin >> samd51::PORT_SHIFT].IN.reg     & (1ul << (pin & samd51::PIN_MASK)); }
 
   enum pin_mode_t
   { output
@@ -178,7 +190,7 @@ namespace lgfx
     void skip(std::int32_t offset) override { seek(offset, SeekCur); }
     bool seek(std::uint32_t offset) override { return seek(offset, SeekSet); }
     bool seek(std::uint32_t offset, SeekMode mode) { return _fp->seek(offset, mode); }
-    void close() override { _fp->close(); }
+    void close(void) override { if (_fp) _fp->close(); }
     std::int32_t tell(void) override { return _fp->position(); }
 
 #elif __SAMD51_HARMONY__
@@ -206,7 +218,7 @@ namespace lgfx
     {
       return SYS_FS_FileSeek(this->handle, offset, mode) >= 0;
     }
-    void close() override
+    void close(void) override
     {
       if( this->handle != SYS_FS_HANDLE_INVALID ) {
         SYS_FS_FileClose(this->handle);
@@ -264,25 +276,30 @@ namespace lgfx
   /// unimplemented.
   namespace spi
   {
-    void init(int spi_host, int spi_sclk, int spi_miso, int spi_mosi);
+    bool init(int spi_host, int spi_sclk, int spi_miso, int spi_mosi);
     void release(int spi_host);
     void beginTransaction(int spi_host, int freq, int spi_mode = 0);
     void beginTransaction(int spi_host);
     void endTransaction(int spi_host);
-    void writeData(int spi_host, const std::uint8_t* data, std::uint32_t len);
-    void readData(int spi_host, std::uint8_t* data, std::uint32_t len);
+    void writeBytes(int spi_host, const std::uint8_t* data, std::uint32_t len);
+    void readBytes(int spi_host, std::uint8_t* data, std::uint32_t len);
   }
 
   /// unimplemented.
   namespace i2c
   {
-    void init(int i2c_port, int pin_sda, int pin_scl, int freq);
-    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::uint8_t len);
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::uint8_t readlen);
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::uint8_t len);
-    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask = 0);
-    inline bool bitOn(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit)  { return writeRegister8(i2c_port, addr, reg, bit, ~0); }
-    inline bool bitOff(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit) { return writeRegister8(i2c_port, addr, reg, 0, ~bit); }
+    bool init(int i2c_port, int pin_sda, int pin_scl);
+    void release(int i2c_port);
+    void beginTransaction(int i2c_port, int i2c_addr, std::uint32_t freq, bool read = false);
+    bool endTransaction(int i2c_port);
+    bool writeBytes(int i2c_port, const std::uint8_t *data, std::size_t length);
+    bool readBytes(int i2c_port, std::uint8_t *data, std::size_t length);
+//--------
+    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen, int freq = 400000);
+    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length, int freq = 400000);
+    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask = 0, int freq = 400000);
+    inline bool bitOn(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit, int freq = 400000)  { return writeRegister8(i2c_port, addr, reg, bit, ~0, freq); }
+    inline bool bitOff(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit, int freq = 400000) { return writeRegister8(i2c_port, addr, reg, 0, ~bit, freq); }
   }
 
 //----------------------------------------------------------------------------

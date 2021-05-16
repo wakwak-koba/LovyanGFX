@@ -452,7 +452,6 @@ namespace lgfx
 
     static std::uint32_t blend_palette_fast(void* __restrict__ dst, std::uint32_t index, std::uint32_t last, pixelcopy_t* __restrict__ param)
     {
-      auto s = &(static_cast<const argb8888_t*>(param->src_data)[param->src_x + param->src_y * param->src_bitwidth - index]);
       auto dst_bits = param->dst_bits;
       auto dst_mask = param->dst_mask;
       std::uint32_t k = (dst_bits == 1) ? 0xFF
@@ -462,11 +461,37 @@ namespace lgfx
                                         ;
       auto shift = ((~index) * dst_bits) & 7;
       auto d = &(static_cast<std::uint8_t*>(dst)[(index * dst_bits) >> 3]);
+      auto src_x32_add = param->src_x32_add;
+      auto src_y32_add = param->src_y32_add;
+/*
+      if (src_y32_add == 0 && src_x32_add == (1<<FP_SCALE))
+      {
+        auto s = &(static_cast<const argb8888_t*>(param->src_data)[param->src_x + param->src_y * param->src_bitwidth - index]);
+        do {
+          std::uint_fast16_t a = s[index].a;
+          if (a)
+          {
+            std::uint32_t raw = (s[index].R8() + (s[index].G8()<<1) + s[index].B8()) >> 2;
+            if (a != 255)
+            {
+              std::uint_fast16_t inv = (256 - a) * k;
+              raw = (((*d >> shift) & dst_mask) * inv + raw * ++a) >> 8;
+            }
+            *d = (*d & ~(dst_mask << shift)) | (dst_mask & (raw >> (8 - dst_bits))) << shift;
+          }
+          if (!shift) ++d;
+          shift = (shift - dst_bits) & 7;
+        } while (++index != last);
+        return last;
+      }
+//*/
+      auto s = static_cast<const argb8888_t*>(param->src_data);
       do {
-        std::uint_fast16_t a = s[index].a;
+        std::uint32_t i = param->src_x + param->src_y * param->src_bitwidth;
+        std::uint_fast16_t a = s[i].a;
         if (a)
         {
-          std::uint32_t raw = (s[index].R8() + (s[index].G8()<<1) + s[index].B8()) >> 2;
+          std::uint32_t raw = (s[i].R8() + (s[i].G8()<<1) + s[i].B8()) >> 2;
           if (a != 255)
           {
             std::uint_fast16_t inv = (256 - a) * k;
@@ -476,6 +501,8 @@ namespace lgfx
         }
         if (!shift) ++d;
         shift = (shift - dst_bits) & 7;
+        param->src_x32 += src_x32_add;
+        param->src_y32 += src_y32_add;
       } while (++index != last);
       return last;
     }
@@ -483,26 +510,59 @@ namespace lgfx
     template <typename TDst>
     static std::uint32_t blend_rgb_fast(void* __restrict__ dst, std::uint32_t index, std::uint32_t last, pixelcopy_t* __restrict__ param)
     {
-      auto s = &(static_cast<const argb8888_t*>(param->src_data)[param->src_x + param->src_y * param->src_bitwidth - index]);
       auto d = static_cast<TDst*>(dst);
+      auto src_x32_add = param->src_x32_add;
+      auto src_y32_add = param->src_y32_add;
+/*
+      if (src_y32_add == 0 && src_x32_add == (1<<FP_SCALE))
+      {
+        auto s = &(static_cast<const argb8888_t*>(param->src_data)[param->src_x + param->src_y * param->src_bitwidth - index]);
+        for (;;) {
+          std::uint_fast16_t a = s[index].a;
+          if (a)
+          {
+            if (a == 255)
+            {
+              d[index].set(s[index].r, s[index].g, s[index].b);
+              if (++index == last) return last;
+              continue;
+            }
+
+            std::uint_fast16_t inv = 256 - a;
+            ++a;
+            d[index].set( (d[index].R8() * inv + s[index].R8() * a) >> 8
+                        , (d[index].G8() * inv + s[index].G8() * a) >> 8
+                        , (d[index].B8() * inv + s[index].B8() * a) >> 8
+                        );
+          }
+          if (++index == last) return last;
+        }
+      }
+//*/
+      auto s = static_cast<const argb8888_t*>(param->src_data);
       for (;;) {
-        std::uint_fast16_t a = s[index].a;
+        std::uint32_t i = param->src_x + param->src_y * param->src_bitwidth;
+        std::uint_fast16_t a = s[i].a;
         if (a)
         {
           if (a == 255)
           {
-            d[index].set(s[index].r, s[index].g, s[index].b);
+            d[index].set(s[i].r, s[i].g, s[i].b);
+            param->src_x32 += src_x32_add;
+            param->src_y32 += src_y32_add;
             if (++index == last) return last;
             continue;
           }
 
           std::uint_fast16_t inv = 256 - a;
           ++a;
-          d[index].set( (d[index].R8() * inv + s[index].R8() * a) >> 8
-                      , (d[index].G8() * inv + s[index].G8() * a) >> 8
-                      , (d[index].B8() * inv + s[index].B8() * a) >> 8
+          d[index].set( (d[index].R8() * inv + s[i].R8() * a) >> 8
+                      , (d[index].G8() * inv + s[i].G8() * a) >> 8
+                      , (d[index].B8() * inv + s[i].B8() * a) >> 8
                       );
         }
+        param->src_x32 += src_x32_add;
+        param->src_y32 += src_y32_add;
         if (++index == last) return last;
       }
     }

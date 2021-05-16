@@ -17,9 +17,6 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #pragma once
 
-#include <vector>
-#include <cstring>
-
 #include "../../Bus.hpp"
 #include "../common.hpp"
 
@@ -35,6 +32,7 @@ namespace lgfx
     struct config_t
     {
       std::uint32_t freq = 400000;
+      std::uint32_t freq_read = 400000;
       std::int16_t pin_scl = 22;
       std::int16_t pin_sda = 21;
       std::uint8_t i2c_port = 0;      // e.g. ESP32 0=I2C_NUM_0 / 1=I2C_NUM_1
@@ -58,7 +56,7 @@ namespace lgfx
     void wait(void) override;
     bool busy(void) const override;
 
-    void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
+    bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeCommand(const std::uint8_t* data, std::uint32_t length);
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
@@ -73,14 +71,25 @@ namespace lgfx
     void beginRead(void) override;
     void endRead(void) override;
     std::uint32_t readData(std::uint_fast8_t bit_length) override;
-    void readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
+    bool readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
     void readPixels(void* dst, pixelcopy_t* param, std::uint32_t length) override;
 
-  private:
+  protected:
 
     config_t _cfg;
     FlipBuffer _flip_buffer;
     bool _need_wait;
+    enum state_t
+    {
+      state_none,
+      state_write_none,
+      state_write_cmd,
+      state_write_data,
+      state_read,
+    };
+    state_t _state = state_none;
+
+    void dc_control(bool dc);
   };
 
 //----------------------------------------------------------------------------

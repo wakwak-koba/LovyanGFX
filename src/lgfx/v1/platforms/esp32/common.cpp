@@ -30,7 +30,7 @@ Contributors:
 #include <soc/i2c_reg.h>
 #include <soc/i2c_struct.h>
 
-#if defined ARDUINO
+#if defined ( ARDUINO )
  #include <SPI.h>
  #include <Wire.h>
 #else
@@ -128,6 +128,7 @@ namespace lgfx
       {
         SPI.end();
         SPI.begin(spi_sclk, spi_miso, spi_mosi);
+        _spi_handle[spi_host] = SPI.bus();
       }
 
       if (_spi_handle[spi_host] == nullptr) {
@@ -219,7 +220,10 @@ namespace lgfx
         {
           SPI.end();
         }
-        spiStopBus(_spi_handle[spi_host]);
+        else
+        {
+          spiStopBus(_spi_handle[spi_host]);
+        }
 #else // ESP-IDF
         spi_bus_remove_device(_spi_handle[spi_host]);
         spi_bus_free(static_cast<spi_host_device_t>(spi_host));
@@ -286,7 +290,7 @@ namespace lgfx
       gpio_hi(spi_cs);
     }
 
-    void writeData(int spi_host, const std::uint8_t* data, std::size_t len)
+    void writeBytes(int spi_host, const std::uint8_t* data, std::size_t len)
     {
       std::uint32_t spi_port = (spi_host + 1);
       if (len > 64) len = 64;
@@ -296,7 +300,7 @@ namespace lgfx
       while (READ_PERI_REG(SPI_CMD_REG(spi_port)) & SPI_USR);
     }
 
-    void readData(int spi_host, std::uint8_t* data, std::size_t len)
+    void readBytes(int spi_host, std::uint8_t* data, std::size_t len)
     {
       std::uint32_t spi_port = (spi_host + 1);
       if (len > 64) len = 64;
@@ -313,165 +317,482 @@ namespace lgfx
 
   namespace i2c
   {
-    void init(int i2c_port, int pin_sda, int pin_scl, int freq)
+    struct i2c_context_t
     {
-#if defined (ARDUINO) // Arduino ESP32
-      auto &twowire = (i2c_port) ? Wire1 : Wire;
-      twowire.begin(pin_sda, pin_scl);
-      twowire.setClock(freq);
+      enum state_t
+      {
+        state_disconnect,
+        state_write,
+        state_read
+      };
+      cpp::result<state_t, error_t> state;
 
-#else // ESP-IDF
-      i2c_config_t conf;
-      conf.mode = I2C_MODE_MASTER;
-      conf.sda_io_num = (gpio_num_t)pin_sda;
-      conf.scl_io_num = (gpio_num_t)pin_scl;
-      conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-      conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-      conf.master.clk_speed = freq;
+      bool wait_ack = false;
+      gpio_num_t pin_scl = (gpio_num_t)-1;
+      gpio_num_t pin_sda = (gpio_num_t)-1;
 
-      i2c_param_config(static_cast<i2c_port_t>(i2c_port), &conf);
-      i2c_driver_install(static_cast<i2c_port_t>(i2c_port), I2C_MODE_MASTER, 0, 0, 0);
-#endif
+      void save_reg(i2c_dev_t* dev)
+      {
+        scl_high_period  = dev->scl_high_period.val ;
+        scl_low_period   = dev->scl_low_period.val  ;
+        scl_start_hold   = dev->scl_start_hold.val  ;
+        scl_rstart_setup = dev->scl_rstart_setup.val;
+        scl_stop_hold    = dev->scl_stop_hold.val   ;
+        scl_stop_setup   = dev->scl_stop_setup.val  ;
+        sda_hold         = dev->sda_hold.val        ;
+        sda_sample       = dev->sda_sample.val      ;
+        scl_filter       = dev->scl_filter_cfg.val  ;
+        sda_filter       = dev->sda_filter_cfg.val  ;
+        fifo_conf        = dev->fifo_conf.val       ;
+        timeout          = dev->timeout.val         ;
+      }
+
+      void load_reg(i2c_dev_t* dev)
+      {
+        dev->scl_high_period.val  = scl_high_period ;
+        dev->scl_low_period.val   = scl_low_period  ;
+        dev->scl_start_hold.val   = scl_start_hold  ;
+        dev->scl_rstart_setup.val = scl_rstart_setup;
+        dev->scl_stop_hold.val    = scl_stop_hold   ;
+        dev->scl_stop_setup.val   = scl_stop_setup  ;
+        dev->sda_hold.val         = sda_hold        ;
+        dev->sda_sample.val       = sda_sample      ;
+        dev->scl_filter_cfg.val   = scl_filter      ;
+        dev->sda_filter_cfg.val   = sda_filter      ;
+        dev->fifo_conf.val        = fifo_conf       ;
+        dev->timeout.val          = timeout         ;
+      }
+
+    private:
+      std::uint32_t scl_high_period;
+      std::uint32_t scl_low_period;
+      std::uint32_t scl_start_hold;
+      std::uint32_t scl_rstart_setup;
+      std::uint32_t scl_stop_hold;
+      std::uint32_t scl_stop_setup;
+      std::uint32_t sda_hold;
+      std::uint32_t sda_sample;
+      std::uint32_t scl_filter;
+      std::uint32_t sda_filter;
+      std::uint32_t fifo_conf;
+      std::uint32_t timeout;
+    };
+    i2c_context_t i2c_context[I2C_NUM_MAX];
+
+    static void i2c_set_cmd(i2c_dev_t* dev, uint8_t index, uint8_t op_code, uint8_t byte_num)
+    {
+      typeof(dev->command[0]) cmd;
+      cmd.val = 0;
+      cmd.ack_en = (op_code == I2C_CMD_WRITE) || (op_code == I2C_CMD_READ);
+      cmd.byte_num = byte_num;
+      cmd.op_code = op_code;
+      dev->command[index].val = cmd.val;
     }
 
-    void setClock(int i2c_port, int clk_speed)
+    static void i2c_stop(int i2c_port)
     {
-#if defined (ARDUINO) // Arduino ESP32
-      auto &twowire = (i2c_port) ? Wire1 : Wire;
-      twowire.setClock(clk_speed);
-#else
-      static constexpr std::uint32_t MIN_I2C_CLKS = 16;
-      static constexpr std::uint32_t INTERRUPT_CYCLE_OVERHEAD = 16000;
+      static constexpr int I2C_CLR_BUS_HALF_PERIOD_US = 5; // use standard 100kHz data rate
+      static constexpr int I2C_CLR_BUS_SCL_NUM        = 9;
 
+      gpio_num_t sda_io = i2c_context[i2c_port].pin_sda;
+      gpio_set_level(sda_io, 1);
+      gpio_set_direction(sda_io, GPIO_MODE_INPUT_OUTPUT_OD);
+
+      gpio_num_t scl_io = i2c_context[i2c_port].pin_scl;
+      gpio_set_level(scl_io, 1);
+      gpio_set_direction(scl_io, GPIO_MODE_OUTPUT_OD);
+
+      auto mod = i2c_port == 0 ? PERIPH_I2C0_MODULE : PERIPH_I2C1_MODULE;
+      periph_module_disable(mod);
+      gpio_set_level(scl_io, 0);
+
+      // SDAがHIGHになるまでクロック送出しながら待機する。
+      int i = 0;
+      while (!gpio_get_level(sda_io) && (i++ < I2C_CLR_BUS_SCL_NUM))
+      {
+        ets_delay_us(I2C_CLR_BUS_HALF_PERIOD_US);
+        gpio_set_level(scl_io, 1);
+        ets_delay_us(I2C_CLR_BUS_HALF_PERIOD_US);
+        gpio_set_level(scl_io, 0);
+      }
+      gpio_set_level(sda_io, 0); // setup for STOP
+      periph_module_enable(mod);
+      gpio_set_level(scl_io, 1);
+      periph_module_reset(mod);
+      //gpio_set_level(sda_io, 1); // STOP, SDA low -> high while SCL is HIGH
+      i2c_set_pin((i2c_port_t)i2c_port, sda_io, scl_io, gpio_pullup_t::GPIO_PULLUP_ENABLE, gpio_pullup_t::GPIO_PULLUP_ENABLE, I2C_MODE_MASTER);
+    }
+
+    static cpp::result<void, error_t> i2c_wait(int i2c_port, bool flg_stop = false)
+    {
+      if (i2c_context[i2c_port].state.has_error())
+      {
+        return cpp::fail(i2c_context[i2c_port].state.error());
+      }
+      cpp::result<void, error_t> res = {};
+      auto dev = (i2c_port == 0) ? &I2C0 : &I2C1;
+      typeof(dev->int_raw) int_raw;
+//      static constexpr std::uint32_t intmask = I2C_ACK_ERR_INT_RAW_M | I2C_TIME_OUT_INT_RAW_M | I2C_END_DETECT_INT_RAW_M | I2C_ARBITRATION_LOST_INT_RAW_M;
+      static constexpr std::uint32_t intmask = I2C_ACK_ERR_INT_RAW_M | I2C_END_DETECT_INT_RAW_M | I2C_ARBITRATION_LOST_INT_RAW_M;
+      if (i2c_context[i2c_port].wait_ack)
+      {
+        i2c_context[i2c_port].wait_ack = false;
+        int_raw.val = dev->int_raw.val;
+        if (!(int_raw.val & intmask))
+        {
+          std::uint32_t us = lgfx::micros();
+          std::uint32_t us_limit = (dev->scl_high_period.period + dev->scl_low_period.period + 16 ) * (16 + dev->status_reg.tx_fifo_cnt);
+          do
+          {
+            int_raw.val = dev->int_raw.val;
+          } while (!(int_raw.val & intmask) && ((lgfx::micros() - us) <= us_limit));
+        }
+        dev->int_clr.val = int_raw.val;
+
+        if (!int_raw.end_detect || int_raw.ack_err)
+        {
+          res = cpp::fail(error_t::communication_error);
+          i2c_context[i2c_port].state = cpp::fail(error_t::communication_error);
+        }
+      }
+      else
+      {
+        if (flg_stop && i2c_context[i2c_port].state == i2c_context_t::state_read)
+        {
+          i2c_stop(i2c_port);
+          i2c_context[i2c_port].state = i2c_context_t::state_t::state_disconnect;
+        }
+        return res;
+      }
+//*/
+// if (!int_raw.end_detect || int_raw.ack_err)
+// ESP_LOGI("LGFX", "I2C Error %08x", int_raw.val);
+      if (flg_stop || !res)
+      {
+        if (int_raw.end_detect)
+        {
+          i2c_set_cmd(dev, 0, I2C_CMD_STOP, 0);
+          dev->ctr.trans_start = 1;
+          static constexpr std::uint32_t intmask = I2C_ACK_ERR_INT_RAW_M | I2C_TIME_OUT_INT_RAW_M | I2C_END_DETECT_INT_RAW_M | I2C_ARBITRATION_LOST_INT_RAW_M | I2C_TRANS_COMPLETE_INT_RAW_M;
+          std::uint32_t ms = lgfx::millis();
+          taskYIELD();
+          while (!(dev->int_raw.val & intmask) && ((millis() - ms) < 14));          
+          //ESP_LOGI("LGFX", "I2C stop");
+        }
+        else
+        {
+lgfx::pinMode(0, pin_mode_t::output);
+lgfx::gpio_hi(0);
+          dev->ctr.trans_start = 0;
+          dev->fifo_conf.tx_fifo_rst = 1;
+          dev->fifo_conf.tx_fifo_rst = 0;
+          ESP_LOGI("LGFX", "I2C forced stop");
+          i2c_stop(i2c_port);
+lgfx::gpio_lo(0);
+        }
+        if (res)
+        {
+          i2c_context[i2c_port].state = i2c_context_t::state_t::state_disconnect;
+        }
+      }
+      return res;
+    }
+
+    void init(int i2c_port, int pin_sda, int pin_scl)
+    {
+      if (i2c_port >= I2C_NUM_MAX) return;
+      i2c_context[i2c_port].pin_scl = (gpio_num_t)pin_scl;
+      i2c_context[i2c_port].pin_sda = (gpio_num_t)pin_sda;
+
+      i2c_set_pin((i2c_port_t)i2c_port, pin_sda, pin_scl, gpio_pullup_t::GPIO_PULLUP_ENABLE, gpio_pullup_t::GPIO_PULLUP_ENABLE, I2C_MODE_MASTER);
+
+      periph_module_enable(i2c_port == 0 ? PERIPH_I2C0_MODULE : PERIPH_I2C1_MODULE);
+      periph_module_reset(i2c_port == 0 ? PERIPH_I2C0_MODULE : PERIPH_I2C1_MODULE);
+    }
+
+    void release(int i2c_port)
+    {
+      if (i2c_port >= I2C_NUM_MAX) return;
+      periph_module_disable(i2c_port == 0 ? PERIPH_I2C0_MODULE : PERIPH_I2C1_MODULE);
+      pinMode(i2c_context[i2c_port].pin_scl, pin_mode_t::input);
+      pinMode(i2c_context[i2c_port].pin_sda, pin_mode_t::input);
+    }
+
+    void beginTransaction(int i2c_port, int i2c_addr, std::uint32_t freq, bool read)
+    {
+      if (i2c_port >= I2C_NUM_MAX) return;
+      if (i2c_addr >= 1024) return;
+//ESP_LOGI("LGFX", "i2c::beginTransaction : port:%d / addr:%02x / freq:%d / rw:%d", i2c_port, i2c_addr, freq, read);
+      auto dev = (i2c_port == 0) ? &I2C0 : &I2C1;
+      i2c_context[i2c_port].save_reg(dev);
+
+      if (dev->status_reg.bus_busy)
+      {
+        ESP_LOGI("LGFX", "i2c::begin wait");
+        auto ms = micros();
+        do
+        {
+          taskYIELD();
+        } while (dev->status_reg.bus_busy && micros() - ms < 100);
+      }
+
+      dev->int_ena.val = 0;
+      dev->timeout.tout = 0xFFFFF; // max 13ms
+// ---------- i2c_ll_master_init
+      typeof(dev->ctr) ctrl_reg;
+      ctrl_reg.val = 0;
+      ctrl_reg.ms_mode = 1;       // master mode
+      ctrl_reg.sda_force_out = 1;
+      ctrl_reg.scl_force_out = 1;
+      dev->ctr.val = ctrl_reg.val;
+// ---------- i2c_ll_master_init
+      typeof(dev->fifo_conf) fifo_conf_reg;
+      fifo_conf_reg.val = 0;
+      fifo_conf_reg.tx_fifo_rst = 1;
+      fifo_conf_reg.rx_fifo_rst = 1;
+      dev->fifo_conf.val = fifo_conf_reg.val;
+
+      fifo_conf_reg.val = 0;
+      dev->fifo_conf.val = fifo_conf_reg.val;
+
+      uint32_t fifo_addr = (i2c_port == 0) ? 0x6001301c : 0x6002701c;
+      i2c_set_cmd(dev, 0, I2C_CMD_RESTART, 0);
+      i2c_set_cmd(dev, 2, I2C_CMD_END, 0);
+      if (i2c_addr < 0x78)
+      { // 7bitアドレスの場合
+        i2c_set_cmd(dev, 1, I2C_CMD_WRITE, 1);
+        WRITE_PERI_REG(fifo_addr, i2c_addr << 1 | (read ? I2C_MASTER_READ : I2C_MASTER_WRITE));
+      }
+      else
+      { // 10bitアドレスの場合
+        i2c_set_cmd(dev, 1, I2C_CMD_WRITE, 2);
+        WRITE_PERI_REG(fifo_addr, 0xF0 | (i2c_addr>>8)<<1 | I2C_MASTER_WRITE);
+        WRITE_PERI_REG(fifo_addr,         i2c_addr);
+        if (read)
+        { // 10bitアドレスのread要求の場合
+          i2c_set_cmd(dev, 2, I2C_CMD_RESTART, 0);
+          i2c_set_cmd(dev, 3, I2C_CMD_READ, 1);
+          i2c_set_cmd(dev, 4, I2C_CMD_END, 0);
+          WRITE_PERI_REG(fifo_addr, 0xF0 | (i2c_addr>>8)<<1 | I2C_MASTER_READ);
+        }
+      }
+
+      static constexpr std::uint32_t MIN_I2C_CYCLE = 35;
       rtc_cpu_freq_config_t cpu_freq_conf;
       rtc_clk_cpu_freq_get_config(&cpu_freq_conf);
       std::uint32_t apb = 80 * 1000000;
-      if (cpu_freq_conf.freq_mhz < 80) {
+      if (cpu_freq_conf.freq_mhz < 80)
+      {
         apb = (cpu_freq_conf.source_freq_mhz * 1000000) / cpu_freq_conf.div;
       }
-
-      std::uint32_t cycle = (apb / clk_speed) / 2;
-//ESP_LOGI("LGFX", "apb:%d cpu:%d i2c:%d", apb, cpu_freq_conf.freq_mhz * 1000000, clk_speed);
-
-      if (cycle < (MIN_I2C_CLKS/2) ) {
-          cycle = (MIN_I2C_CLKS/2);
-          clk_speed = apb/(cycle*2);
-      } else if ( cycle> 4095) {
-          cycle = 4095;
-          clk_speed = apb/(cycle*2);
-      }
-
-      i2c_dev_t* dev = i2c_port == 0 ? &I2C0 : &I2C1;
-/*
-      uint32_t fifo_delta = (INTERRUPT_CYCLE_OVERHEAD/((cpu_freq_conf.freq_mhz * 1000000 / clk_speed) * 10)) + 1;
-      if (fifo_delta > 24) fifo_delta=24;
-      dev->fifo_conf.rx_fifo_full_thrhd = 32 - fifo_delta;
-      dev->fifo_conf.tx_fifo_empty_thrhd = fifo_delta;
-//*/
-
-//ESP_LOGI("LGFX", "period:low:%d high:%d  new:%d", dev->scl_low_period.period, dev->scl_high_period.period, period);
-
-      dev->timeout.tout = cycle * 20;
+      std::uint32_t cycle = std::min(32767u, std::max(MIN_I2C_CYCLE, (apb / (freq + 1) + 1)));
+      freq = apb / cycle;
+      dev->scl_filter_cfg.en = cycle > 64;
+      dev->scl_filter_cfg.thres = 0;
+      dev->sda_filter_cfg.en = cycle > 64;
+      dev->sda_filter_cfg.thres = 0;
 
 /// ESP32 TRM page 286  Table 57: SCL Frequency Configuration
-      std::uint32_t scl_high_period = cycle
-                                    - ( dev->scl_filter_cfg.en
-                                      ? ( dev->scl_filter_cfg.thres > 2
-                                        ? 6 + dev->scl_filter_cfg.thres
-                                        : 8
+      std::uint32_t scl_high_offset = ( dev->scl_filter_cfg.en
+                                      ? ( dev->scl_filter_cfg.thres <= 2
+                                        ? 8 : (6 + dev->scl_filter_cfg.thres)
                                         )
-                                      : 7);
-      dev->scl_high_period.period = scl_high_period;     //the clock num during SCL is high level
-      dev->scl_low_period.period = cycle - 1;      //the clock num during SCL is low level
+                                      : 7
+                                      );
 
+      std::uint32_t period_total = cycle - scl_high_offset - 1;
+      std::uint32_t scl_high_period = std::max(18u, (period_total-10) >> 1);
+      std::uint32_t scl_low_period  = period_total - scl_high_period;
+
+      dev->scl_high_period.period = scl_high_period;
+      dev->scl_low_period .period = scl_low_period ;
+
+      dev->sda_hold.time   = std::min(1023, (dev->scl_high_period.period >> 1));
+      dev->sda_sample.time = std::min(1023, (dev->scl_low_period .period >> 1));
+
+      if (freq > 400000)
+      {
+        cycle = cycle * freq / 400000;
+      }
+      else
+      if (cycle > ((1<<10)-1))
+      {
+        cycle = (1<<10)-1;
+      }
+      dev->scl_stop_hold.time = cycle << 1;     //the clock num after the STOP bit's posedge
+      dev->scl_stop_setup.time = cycle;    //the clock num between the posedge of SCL and the posedge of SDA
       dev->scl_start_hold.time = cycle;    //the clock num between the negedge of SDA and negedge of SCL for start mark
       dev->scl_rstart_setup.time = cycle;  //the clock num between the posedge of SCL and the negedge of SDA for restart mark
 
-      dev->scl_stop_hold.time = cycle;     //the clock num after the STOP bit's posedge
-      dev->scl_stop_setup.time = cycle;    //the clock num between the posedge of SCL and the posedge of SDA
-
-      uint32_t halfPeriod = cycle / 2;
-
-      dev->sda_hold.time = halfPeriod;       //the clock num I2C used to hold the data after the negedge of SCL.
-      dev->sda_sample.time = halfPeriod;     //the clock num I2C used to sample data on SDA after the posedge of SCL
-#endif
+      dev->int_clr.val = 0x1FFF;
+      dev->ctr.trans_start = 1;
+      i2c_context[i2c_port].state = read ? i2c_context_t::state_t::state_read : i2c_context_t::state_t::state_write;
+//      i2c_context[i2c_port].connected = true;
+      i2c_context[i2c_port].wait_ack = true;
     }
 
-    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::size_t len)
+    cpp::result<void, error_t> endTransaction(int i2c_port)
     {
-#if defined (ARDUINO) // Arduino ESP32
-      auto &twowire = (i2c_port) ? Wire1 : Wire;
-      return 0 == twowire.writeTransmission(addr, const_cast<std::uint8_t*>(data), len);
-
-#else // ESP-IDF
-      auto cmd = i2c_cmd_link_create();
-      i2c_master_start(cmd);
-      i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-      i2c_master_write(cmd, const_cast<std::uint8_t*>(data), len, true);
-      i2c_master_stop(cmd);
-
-      auto result = i2c_master_cmd_begin(static_cast<i2c_port_t>(i2c_port), cmd, 10/portTICK_PERIOD_MS);
-      i2c_cmd_link_delete(cmd);
-
-      return result == ESP_OK;
-#endif
-   }
-
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen)
+      if (i2c_port >= I2C_NUM_MAX) return cpp::fail(error_t::invalid_params);
+      auto res = i2c_wait(i2c_port, true);
+      auto dev = (i2c_port == 0) ? &I2C0 : &I2C1;
+      if (dev->status_reg.bus_busy)
+      {
+        ESP_LOGI("LGFX", "i2c::end wait");
+        auto ms = micros();
+        do
+        {
+          taskYIELD();
+        } while (dev->status_reg.bus_busy && micros() - ms < 100);
+      }
+      i2c_context[i2c_port].load_reg(dev);
+      if (res.has_value())
+      {
+        return {};
+      }
+      return cpp::fail(res.error());
+    }
+//*/
+    bool writeBytes(int i2c_port, const std::uint8_t *data, std::size_t length)
     {
-#if defined (ARDUINO) // Arduino ESP32
-      auto &twowire = (i2c_port) ? Wire1 : Wire;
-      if (0 != twowire.writeTransmission(addr, const_cast<std::uint8_t*>(writedata), writelen)) return false;
-      return (0 == twowire.readTransmission(addr, readdata, readlen));
-#else // ESP-IDF
-      auto cmd = i2c_cmd_link_create();
-      i2c_master_start(cmd);
-      i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-      i2c_master_write(cmd, const_cast<std::uint8_t*>(writedata), writelen, true);
-      i2c_master_start(cmd);
-      i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_READ, true);
-      i2c_master_read(cmd, readdata, readlen, I2C_MASTER_LAST_NACK);
-      i2c_master_stop(cmd);
-
-      auto result = i2c_master_cmd_begin(static_cast<i2c_port_t>(i2c_port), cmd, 10/portTICK_PERIOD_MS);
-      i2c_cmd_link_delete(cmd);
-
-      return result == ESP_OK;
-#endif
+      if (i2c_port >= I2C_NUM_MAX || !length) return false;
+      if (i2c_context[i2c_port].state != i2c_context_t::state_write) return false;
+      /*
+      if (!i2c_context[i2c_port].connected) return false;
+      if (i2c_context[i2c_port].mode != i2c_context_t::i2c_mode_write)
+      {
+        //ESP_LOGI("LGFX", "i2c write error : read mode.");
+        return false;
+      }
+      //*/
+/*
+ESP_LOGI("LGFX", "W:%d", length);
+char buf[128];
+for (int i = 0; i < length; ++i)
+{
+  vsprintf(&buf[i*3], "%02x ", data[i]);
+}
+//*/ 
+      static constexpr int txfifo_limit = 32;
+      auto dev = (i2c_port == 0) ? &I2C0 : &I2C1;
+      uint32_t fifo_addr = (i2c_port == 0) ? 0x6001301c : 0x6002701c;
+      std::size_t len = ((length - 1) & (txfifo_limit-1)) + 1;
+      do
+      {
+        if (!i2c_wait(i2c_port))
+        {
+          ESP_LOGI("LGFX", "i2c write error : ack wait");
+          return false;
+        }
+        std::size_t idx = 0;
+        do
+        {
+          WRITE_PERI_REG(fifo_addr, data[idx]);
+        } while (++idx != len);
+        i2c_set_cmd(dev, 0, I2C_CMD_WRITE, len);
+        i2c_set_cmd(dev, 1, I2C_CMD_END, 0);
+        dev->ctr.trans_start = 1;
+        data += len;
+        length -= len;
+        len = txfifo_limit;
+        i2c_context[i2c_port].wait_ack = true;
+      } while (length);
+      return true;
     }
 
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t len)
+    bool readBytes(int i2c_port, std::uint8_t *readdata, std::size_t length)
     {
-#if defined (ARDUINO) // Arduino ESP32
-      auto &twowire = (i2c_port) ? Wire1 : Wire;
-      std::uint8_t tmp[2] = { reg };
-      if (0 != twowire.writeTransmission(addr, tmp, 1)) return false;
-      return (0 == twowire.readTransmission(addr, data, len));
-#else // ESP-IDF
-      auto cmd = i2c_cmd_link_create();
-      i2c_master_start(cmd);
-      i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_WRITE, true);
-      i2c_master_write_byte(cmd, reg, true);
-      i2c_master_start(cmd);
-      i2c_master_write_byte(cmd, (addr << 1) | I2C_MASTER_READ, true);
-      i2c_master_read(cmd, data, len, I2C_MASTER_LAST_NACK);
-      i2c_master_stop(cmd);
+      static constexpr std::uint32_t intmask = I2C_ACK_ERR_INT_RAW_M | I2C_TIME_OUT_INT_RAW_M | I2C_END_DETECT_INT_RAW_M | I2C_ARBITRATION_LOST_INT_RAW_M;
+      if (i2c_port >= I2C_NUM_MAX) return false;
+      if (i2c_context[i2c_port].state != i2c_context_t::state_read) return false;
+      if (!length) return true;
+/*
+      if (i2c_context[i2c_port].mode != i2c_context_t::i2c_mode_read)
+      {
+        //ESP_LOGI("LGFX", "i2c read error : write mode.");
+        return false;
+      }
+ESP_LOGI("LGFX", "R:%d", length);
+*/
+      auto dev = (i2c_port == 0) ? &I2C0 : &I2C1;
+      std::size_t len = 0;
 
-      auto result = i2c_master_cmd_begin(static_cast<i2c_port_t>(i2c_port), cmd, 10/portTICK_PERIOD_MS);
-      i2c_cmd_link_delete(cmd);
+      std::uint32_t us_limit = (dev->scl_high_period.period + dev->scl_low_period.period + 16);
+      do
+      {
+        len = ((length-1) & 63) + 1;
+        length -= len;
+        if (!i2c_wait(i2c_port))
+        {
+          ESP_LOGI("LGFX", "i2c read error : ack wait");
+          return false;
+        }
+        i2c_set_cmd(dev, 0, I2C_CMD_READ, len);
+        i2c_set_cmd(dev, 1, I2C_CMD_END, 0);
+        dev->int_clr.val = intmask;
+        dev->ctr.trans_start = 1;
+        //taskYIELD();
+        do
+        {
+          std::uint32_t us = lgfx::micros();
+          while (0 == dev->status_reg.rx_fifo_cnt && !(dev->int_raw.val & intmask) && ((micros() - us) <= us_limit));
+          if (0 != dev->status_reg.rx_fifo_cnt)
+          {
+            *readdata++ = dev->fifo_data.data;
+          }
+          else
+          {
+            i2c_stop(i2c_port);
+            ESP_LOGI("LGFX", "i2c read error : read timeout");
+            i2c_context[i2c_port].state = cpp::fail(error_t::communication_error);
+            return false;
+          }
+        } while (--len);
+      } while (length);
 
-      return result == ESP_OK;
-#endif
+      return true;
     }
 
-    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask)
+    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen, int freq)
     {
+      if (i2c_port >= I2C_NUM_MAX) return false;
+      for (int retry = 5; retry >= 0; --retry)
+      {
+        beginTransaction(i2c_port, addr, freq, false);
+        if (writeBytes(i2c_port, writedata, writelen)
+        && endTransaction(i2c_port))
+        {
+          beginTransaction(i2c_port, addr, freq, true);
+          if (readBytes(i2c_port, readdata, readlen)
+          && endTransaction(i2c_port))
+          {
+            return true;
+          }
+        }
+        endTransaction(i2c_port);
+        ESP_LOGI("LGFX","I2C wrbytes retry");
+      }
+      return false;
+    }
+
+    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length, int freq)
+    {
+      return writeReadBytes(i2c_port, addr, &reg, 1, data, length, freq);
+    }
+
+    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask, int freq)
+    {
+      if (i2c_port >= I2C_NUM_MAX) return false;
       std::uint8_t tmp[2] = { reg, data };
-      if (mask) {
-        if (!readRegister(i2c_port, addr, reg, &tmp[1], 1)) return false;
+      if (mask)
+      {
+        if (!writeReadBytes(i2c_port, addr, &reg, 1, &tmp[1], 1, freq)) return false;
         tmp[1] = (tmp[1] & mask) | data;
       }
-      return writeBytes(i2c_port, addr, tmp, 2);
+      beginTransaction(i2c_port, addr, freq, false);
+      bool res = writeBytes(i2c_port, tmp, 2);
+      endTransaction(i2c_port);
+      return res;
     }
   }
 

@@ -64,6 +64,10 @@ namespace lgfx
     _gpio_reg_dc[0] = get_gpio_lo_reg(cfg.pin_dc);
     _gpio_reg_dc[1] = get_gpio_hi_reg(cfg.pin_dc);
     _last_freq_apb = 0;
+
+    auto spi_mode = cfg.spi_mode;
+    _user_reg = (spi_mode == 1 || spi_mode == 2) ? SPI_CK_OUT_EDGE | SPI_USR_MOSI : SPI_USR_MOSI;
+
 //ESP_LOGI("LGFX","Bus_SPI::config  spi_port:%d  dc:%0d %02x", spi_port, _cfg.pin_dc, _mask_reg_dc);
   }
 
@@ -106,12 +110,10 @@ namespace lgfx
 
     auto spi_mode = _cfg.spi_mode;
     std::uint32_t pin  = (spi_mode & 2) ? SPI_CK_IDLE_EDGE : 0;
-    std::uint32_t user = (spi_mode == 1 || spi_mode == 2) ? SPI_CK_OUT_EDGE | SPI_USR_MOSI : SPI_USR_MOSI;
-    _user_reg = user;
 
     if (_cfg.use_lock) spi::beginTransaction(_cfg.spi_host);
 
-    *_spi_user_reg = user;
+    *_spi_user_reg = _user_reg;
     auto spi_port = _spi_port;
     *reg(SPI_PIN_REG(spi_port)) = pin;
     *reg(SPI_CLOCK_REG(spi_port)) = clkdiv_write;
@@ -137,7 +139,7 @@ namespace lgfx
     return (*_spi_cmd_reg & SPI_USR);
   }
 
-  void Bus_SPI::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
+  bool Bus_SPI::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
 //ESP_LOGI("LGFX","writeCmd: %02x  len:%d   dc:%02x", data, bit_length, _mask_reg_dc);
     --bit_length;
@@ -151,7 +153,7 @@ namespace lgfx
     *spi_mosi_dlen_reg = bit_length;   // set bitlength
     *spi_w0_reg = data;                // set data
     *spi_cmd_reg = SPI_USR;            // exec SPI
-//delay(1);
+    return true;
   }
 
   void Bus_SPI::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
@@ -168,7 +170,6 @@ namespace lgfx
     *spi_mosi_dlen_reg = bit_length;   // set bitlength
     *spi_w0_reg = data;                // set data
     *spi_cmd_reg = SPI_USR;            // exec SPI
-//delay(1);
   }
 
   void Bus_SPI::writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count)
@@ -268,12 +269,12 @@ namespace lgfx
     const std::uint8_t bytes = param->dst_bits >> 3;
     if (_cfg.dma_channel)
     {
-      std::uint32_t limit = (bytes == 2) ? 16 : 12;
+      std::uint32_t limit = (bytes == 2) ? 32 : 24;
       std::uint32_t len;
       do
       {
-        len = ((length - 1) % limit) + 1;
-        if (limit <= 512) limit <<= 1;
+        len = (limit << 1) <= length ? limit : length;
+        if (limit <= 256) limit <<= 1;
         auto dmabuf = _flip_buffer.getBuffer(len * bytes);
         param->fp_copy(dmabuf, 0, len, param);
         writeBytes(dmabuf, len * bytes, true, true);
@@ -500,7 +501,7 @@ namespace lgfx
     return *spi_w0_reg;
   }
 
-  void Bus_SPI::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
+  bool Bus_SPI::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
   {
     if (_cfg.dma_channel && use_dma) {
       wait_spi();
@@ -540,6 +541,7 @@ namespace lgfx
         dst += len2;
       } while (length);
     }
+    return true;
   }
 
   void Bus_SPI::readPixels(void* dst, pixelcopy_t* param, std::uint32_t length)

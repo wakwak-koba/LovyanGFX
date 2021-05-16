@@ -41,8 +41,6 @@ namespace lgfx
       std::uint8_t sercom_index = 7;
       std::int8_t  sercom_clksrc = 0;   // -1=notchange / 0=select GCLK0
       std::uint32_t sercom_clkfreq = F_CPU;
-      SercomSpiTXPad pad_mosi = SPI_PAD_3_SCK_1;  // PAD_SPI3_TX;
-      SercomRXPad    pad_miso = SERCOM_RX_PAD_2;  // PAD_SPI3_RX;
 
       std::uint32_t freq_write = 16000000;
       std::uint32_t freq_read  =  8000000;
@@ -70,7 +68,7 @@ namespace lgfx
     void wait(void) override;
     bool busy(void) const override;
 
-    void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
+    bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
     void writePixels(pixelcopy_t* param, std::uint32_t length) override;
@@ -84,13 +82,11 @@ namespace lgfx
     void beginRead(void) override;
     void endRead(void) override;
     std::uint32_t readData(std::uint_fast8_t bit_length) override;
-    void readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
+    bool readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
     void readPixels(void* dst, pixelcopy_t* param, std::uint32_t length) override;
 
   private:
 
-    void resetSPI(void);
-    void enableSPI(void);
     std::uint32_t FreqToClockDiv(std::uint32_t freq);
     void setFreqDiv(std::uint32_t div);
 

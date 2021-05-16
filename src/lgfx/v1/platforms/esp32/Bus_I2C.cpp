@@ -17,6 +17,8 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #if defined (ESP32) || defined (CONFIG_IDF_TARGET_ESP32) || defined (CONFIG_IDF_TARGET_ESP32S2) || defined (ESP_PLATFORM)
 
+#include <soc/i2c_struct.h>
+
 #include "Bus_I2C.hpp"
 #include "../../misc/pixelcopy.hpp"
 
@@ -29,139 +31,208 @@ namespace lgfx
   void Bus_I2C::config(const config_t& config)
   {
     _cfg = config;
-
   }
 
   void Bus_I2C::init(void)
   {
-    lgfx::i2c::init(_cfg.i2c_port, _cfg.pin_sda, _cfg.pin_scl, _cfg.freq);
+    lgfx::i2c::init(_cfg.i2c_port, _cfg.pin_sda, _cfg.pin_scl);
+    _state = state_t::state_none;
   }
 
   void Bus_I2C::release(void)
   {
+    lgfx::i2c::release(_cfg.i2c_port);
+    _state = state_t::state_none;
   }
 
   void Bus_I2C::beginTransaction(void)
   {
-    lgfx::i2c::setClock(_cfg.i2c_port, _cfg.freq);
-  }
+    // 既に開始直後の場合は終了
+    if (_state == state_t::state_write_none)
+    {
+      return;
+    }
 
-  void Bus_I2C::endTransaction(void)
-  {
+    if (_state != state_none)
+    {
+      lgfx::i2c::endTransaction(_cfg.i2c_port);
+    }
+    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq, false);
+    _state = state_t::state_write_none;
   }
 
   void Bus_I2C::beginRead(void)
   {
+    if (_state == state_t::state_read)
+    {
+      return;
+    }
+    
+    if (_state != state_t::state_none)
+    {
+      lgfx::i2c::endTransaction(_cfg.i2c_port);
+    }
+    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq_read, true);
+    _state = state_t::state_read;
+  }
+
+  void Bus_I2C::endTransaction(void)
+  {
+    if (_state == state_t::state_none)
+    {
+      return;
+    }
+
+    _state = state_t::state_none;
+    lgfx::i2c::endTransaction(_cfg.i2c_port);
   }
 
   void Bus_I2C::endRead(void)
   {
+    endTransaction();
   }
 
   void Bus_I2C::wait(void)
   {
+    auto dev = (_cfg.i2c_port == 0) ? &I2C0 : &I2C1;
+    while (dev->status_reg.bus_busy) { taskYIELD(); }
   }
 
   bool Bus_I2C::busy(void) const
   {
-    return false;
+    auto dev = (_cfg.i2c_port == 0) ? &I2C0 : &I2C1;
+    return dev->status_reg.bus_busy;
   }
 
-  void Bus_I2C::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
+  void Bus_I2C::dc_control(bool dc)
   {
-    std::uint8_t buf[8];
-    std::size_t idx = 0;
-    for (; idx < _cfg.prefix_len; ++idx)
+    // リード中の場合はトランザクションを終了しておく
+    if (_state == state_t::state_read)
     {
-      buf[idx] = _cfg.prefix_cmd >> (idx << 3);
+      _state = state_t::state_none;
+      lgfx::i2c::endTransaction(_cfg.i2c_port);
     }
-    memcpy(&buf[idx], &data, 4);
-    //*reinterpret_cast<std::uint32_t*>(&buf[1]) = data;
-    lgfx::i2c::writeBytes(_cfg.i2c_port, _cfg.i2c_addr, buf, (bit_length >> 3) + idx);
+
+    // まだトランザクションが開始されていない場合は開始しておく
+    if (_state == state_t::state_none)
+    {
+      _state = state_t::state_write_none;
+      lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq, false);
+    }
+
+    // DCプリフィクスなしの場合は後の処理は不要
+    if (_cfg.prefix_len == 0) return;
+
+    state_t st = dc ? state_t::state_write_data : state_t::state_write_cmd;
+    // 既に送信済みのDCプリフィクスが要求と一致している場合は終了
+    if (_state == st) return;
+
+    // DCプリフィクスが送信済みの場合、送信済みのDCプリフィクスと要求が不一致なのでトランザクションをやり直す。
+    if (_state != state_t::state_write_none)
+    {
+      lgfx::i2c::endTransaction(_cfg.i2c_port);
+      lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq, false);
+    }
+    lgfx::i2c::writeBytes(_cfg.i2c_port, (std::uint8_t*)(dc ? &_cfg.prefix_data : &_cfg.prefix_cmd), _cfg.prefix_len);
+    _state = st;
+  }
+
+  bool Bus_I2C::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
+  {
+    dc_control(false);
+    return lgfx::i2c::writeBytes(_cfg.i2c_port, (std::uint8_t*)&data, (bit_length >> 3));
   }
 
   void Bus_I2C::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
   {
-    std::uint8_t buf[8];
-    std::size_t idx = 0;
-    for (; idx < _cfg.prefix_len; ++idx)
-    {
-      buf[idx] = _cfg.prefix_data >> (idx << 3);
-    }
-    memcpy(&buf[idx], &data, 4);
-    //*reinterpret_cast<std::uint32_t*>(&buf[1]) = data;
-    lgfx::i2c::writeBytes(_cfg.i2c_port, _cfg.i2c_addr, buf, (bit_length >> 3) + idx);
+    dc_control(true);
+    lgfx::i2c::writeBytes(_cfg.i2c_port, (std::uint8_t*)&data, (bit_length >> 3));
   }
 
   void Bus_I2C::writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t length)
   {
+    dc_control(true);
     const std::uint8_t dst_bytes = bit_length >> 3;
-    std::uint32_t limit = (dst_bytes == 3) ? 12 : 16;
-    auto buf = _flip_buffer.getBuffer(512);
-    std::size_t fillpos = 0;
-    for (; fillpos < _cfg.prefix_len; ++fillpos)
+    std::uint32_t buf0 = data | data << bit_length;
+    std::uint32_t buf1;
+    std::uint32_t buf2;
+    // make 12Bytes data.
+    if (dst_bytes != 3)
     {
-      buf[fillpos] = _cfg.prefix_data >> (fillpos << 3);
+      if (dst_bytes == 1)
+      {
+        buf0 |= buf0 << 16;
+      }
+      buf1 = buf0;
+      buf2 = buf0;
     }
-    auto dmabuf = &buf[fillpos];
-    memcpy(&buf[fillpos], &data, 4);
-    fillpos += dst_bytes;
+    else
+    {
+      buf1 = buf0 >>  8 | buf0 << 16;
+      buf2 = buf0 >> 16 | buf0 <<  8;
+    }
+    std::uint32_t src[8] = { buf0, buf1, buf2, buf0, buf1, buf2, buf0, buf1 };
+    auto buf = reinterpret_cast<std::uint8_t*>(src);
+    std::uint32_t limit = 32 / dst_bytes;
     std::uint32_t len;
     do
     {
       len = ((length - 1) % limit) + 1;
-      if (limit <= 16) limit <<= 1;
-
-      while (fillpos < len * dst_bytes)
-      {
-        memcpy(&dmabuf[fillpos], dmabuf, std::min(fillpos, len * dst_bytes - fillpos));
-        fillpos += fillpos;
-      }
-      i2c::writeBytes(_cfg.i2c_port, _cfg.i2c_addr, buf, len * dst_bytes + 1);
+      i2c::writeBytes(_cfg.i2c_port, buf, len * dst_bytes);
     } while (length -= len);
   }
 
   void Bus_I2C::writePixels(pixelcopy_t* param, std::uint32_t length)
   {
+    dc_control(true);
     const std::uint8_t dst_bytes = param->dst_bits >> 3;
-    std::uint32_t limit = (dst_bytes == 3) ? 12 : 16;
+    std::uint32_t limit = 32 / dst_bytes;
     std::uint32_t len;
+    std::uint8_t buf[32];
     do
     {
       len = ((length - 1) % limit) + 1;
-      if (limit <= 64) limit <<= 1;
-      auto dmabuf = _flip_buffer.getBuffer(len * dst_bytes);
-      param->fp_copy(dmabuf, 0, len, param);
-      writeBytes(dmabuf, len * dst_bytes, true, true);
+      param->fp_copy(buf, 0, len, param);
+      i2c::writeBytes(_cfg.i2c_port, buf, len * dst_bytes);
     } while (length -= len);
   }
 
   void Bus_I2C::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
-    if (_cfg.prefix_len)
-    {
-      auto buf = _flip_buffer.getBuffer(length + _cfg.prefix_len);
-      memcpy(buf, dc ? &_cfg.prefix_data : &_cfg.prefix_cmd, 4);
-      memcpy(&buf[_cfg.prefix_len], data, length);
-      i2c::writeBytes(_cfg.i2c_port, _cfg.i2c_addr, buf, length + _cfg.prefix_len);
-    }
-    else
-    {
-      i2c::writeBytes(_cfg.i2c_port, _cfg.i2c_addr, data, length);
-    }
+    dc_control(dc);
+    i2c::writeBytes(_cfg.i2c_port, data, length);
   }
 
   std::uint32_t Bus_I2C::readData(std::uint_fast8_t bit_length)
   {
-    return 0;
+    beginRead();
+    std::uint32_t res;
+    i2c::readBytes(_cfg.i2c_port, reinterpret_cast<std::uint8_t*>(&res), bit_length >> 3);
+    return res;
   }
 
-  void Bus_I2C::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
+  bool Bus_I2C::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
   {
+    beginRead();
+    return i2c::readBytes(_cfg.i2c_port, dst, length);
   }
 
   void Bus_I2C::readPixels(void* dst, pixelcopy_t* param, std::uint32_t length)
   {
+    beginRead();
+    const auto bytes = param->src_bits >> 3;
+    std::uint32_t regbuf[8];
+    std::uint32_t limit = 32 / bytes;
+
+    param->src_data = regbuf;
+    std::int32_t dstindex = 0;
+    do {
+      std::uint32_t len = (limit > length) ? length : limit;
+      length -= len;
+      i2c::readBytes(_cfg.i2c_port, (std::uint8_t*)regbuf, len * bytes);
+      param->src_x = 0;
+      dstindex = param->fp_copy(dst, dstindex, dstindex + len, param);
+    } while (length);
   }
 
 //----------------------------------------------------------------------------

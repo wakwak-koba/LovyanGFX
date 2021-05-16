@@ -18,6 +18,7 @@ Contributors:
 #pragma once
 
 #include "../../misc/DataWrapper.hpp"
+#include "../../../utility/result.hpp"
 
 #include <cstdint>
 
@@ -33,27 +34,21 @@ namespace lgfx
 
   __attribute__ ((unused)) static inline unsigned long millis(void) { return (unsigned long) (esp_timer_get_time() / 1000ULL); }
   __attribute__ ((unused)) static inline unsigned long micros(void) { return (unsigned long) (esp_timer_get_time()); }
-  __attribute__ ((unused)) static inline void delay(std::uint32_t ms) { vTaskDelay(ms / portTICK_PERIOD_MS); }
-  __attribute__ ((unused)) static inline void delayMicroseconds(std::uint32_t us)
+  __attribute__ ((unused)) static inline void delayMicroseconds(std::uint32_t us) { ets_delay_us(us); }
+  __attribute__ ((unused)) static inline void delay(std::uint32_t ms)
   {
-    std::uint32_t m = micros();
-    if (us)
+    std::uint32_t time = micros();
+    vTaskDelay( (ms >= portTICK_PERIOD_MS) ? (ms / portTICK_PERIOD_MS - 1) : 0);
+    if (ms != 0 && ms < portTICK_PERIOD_MS*8)
     {
-      std::uint32_t e = (m + us);
-      if (m > e)
+      ms *= 1000;
+      time = micros() - time;
+      if (time < ms)
       {
-        while (micros() > e)
-        {
-          __asm__ __volatile__ ("nop");
-        }
-      }
-      while (micros() < e)
-      {
-        __asm__ __volatile__ ("nop");
+        ets_delay_us(ms - time);
       }
     }
   }
-
 
   static inline void* heap_alloc(      size_t length) { return heap_caps_malloc(length, MALLOC_CAP_8BIT);  }
   static inline void* heap_alloc_dma(  size_t length) { return heap_caps_malloc((length + 3) & ~3, MALLOC_CAP_DMA);  }
@@ -139,7 +134,7 @@ public:
     void skip(std::int32_t offset) override { seek(offset, SeekCur); }
     bool seek(std::uint32_t offset) override { return seek(offset, SeekSet); }
     bool seek(std::uint32_t offset, SeekMode mode) { return _fp->seek(offset, mode); }
-    void close() override { _fp->close(); }
+    void close(void) override { if (_fp) _fp->close(); }
     std::int32_t tell(void) override { return _fp->position(); }
   };
  #else
@@ -179,7 +174,7 @@ public:
     void skip(std::int32_t offset) override { seek(offset, SEEK_CUR); }
     bool seek(std::uint32_t offset) override { return seek(offset, SEEK_SET); }
     bool seek(std::uint32_t offset, int origin) { return fseek(_fp, offset, origin); }
-    void close() override { fclose(_fp); }
+    void close() override { if (_fp) fclose(_fp); }
     std::int32_t tell(void) override { return ftell(_fp); }
   };
 
@@ -214,6 +209,13 @@ public:
 
 //----------------------------------------------------------------------------
 
+  enum error_t
+  { unknown_err
+  , invalid_params
+  , communication_error
+  , periph_error
+  };
+
   namespace spi
   {
     void init(int spi_host, int spi_sclk, int spi_miso, int spi_mosi, int dma_channel);
@@ -222,21 +224,28 @@ public:
     void beginTransaction(int spi_host, int freq, int spi_mode = 0);
     void beginTransaction(int spi_host);
     void endTransaction(int spi_host);
-    void writeData(int spi_host, const std::uint8_t* data, std::size_t length);
-    void readData(int spi_host, std::uint8_t* data, std::size_t length);
+    void writeBytes(int spi_host, const std::uint8_t* data, std::size_t length);
+    void readBytes(int spi_host, std::uint8_t* data, std::size_t length);
   }
-
 
   namespace i2c
   {
-    void init(int i2c_port, int pin_sda, int pin_scl, int freq);
-    void setClock(int i2c_port, int freq);
-    bool writeBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *data, std::size_t length);
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen);
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length);
-    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask = 0);
-    inline bool bitOn(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit)  { return writeRegister8(i2c_port, addr, reg, bit, ~0); }
-    inline bool bitOff(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit) { return writeRegister8(i2c_port, addr, reg, 0, ~bit); }
+    void init(int i2c_port, int pin_sda, int pin_scl);
+    void release(int i2c_port);
+    void beginTransaction(int i2c_port, int i2c_addr, std::uint32_t freq, bool read = false);
+/*
+    bool endTransaction(int i2c_port);
+/*/
+    cpp::result<void, error_t> endTransaction(int i2c_port);
+//*/
+    bool writeBytes(int i2c_port, const std::uint8_t *data, std::size_t length);
+    bool readBytes(int i2c_port, std::uint8_t *data, std::size_t length);
+//--------
+    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen, int freq = 400000);
+    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length, int freq = 400000);
+    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask = 0, int freq = 400000);
+    inline bool bitOn(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit, int freq = 400000)  { return writeRegister8(i2c_port, addr, reg, bit, ~0, freq); }
+    inline bool bitOff(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t bit, int freq = 400000) { return writeRegister8(i2c_port, addr, reg, 0, ~bit, freq); }
   }
 
 //----------------------------------------------------------------------------

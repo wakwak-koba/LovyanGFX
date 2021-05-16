@@ -18,7 +18,6 @@ Contributors:
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 
 namespace lgfx
 {
@@ -45,8 +44,9 @@ namespace lgfx
       std::uint16_t x_max = 3600;
       std::uint16_t y_min = 0;
       std::uint16_t y_max = 3600;
-      bool bus_shared = false;
+      bool bus_shared = false;          /// パネルとタッチが同じバスに繋がっている場合true
       std::int16_t pin_int = -1;
+      std::uint8_t offset_rotation = 0;
       union
       {
         struct
@@ -79,6 +79,16 @@ namespace lgfx
     virtual void sleep(void) = 0;
     virtual bool isEnable(void) { return true; };
     virtual std::uint_fast8_t getTouchRaw(touch_point_t* tp, std::uint_fast8_t number) = 0;
+/*
+    void calibrate(std::int32_t w, std::int32_t h)
+    {
+      std::uint16_t parameters[8] =
+        { _cfg.x_min, _cfg.y_min
+        , _cfg.x_min, _cfg.y_max
+        , _cfg.x_max, _cfg.y_min
+        , _cfg.x_max, _cfg.y_max };
+      setCalibrate(parameters, w, h);
+    }
 
     std::uint_fast8_t getTouch(touch_point_t* tp, std::uint_fast8_t number)
     {
@@ -167,11 +177,11 @@ namespace lgfx
       _affine[4] = mat[1][0] * v3 + mat[1][1] * v4 + mat[1][2] * v5;
       _affine[5] = mat[2][0] * v3 + mat[2][1] * v4 + mat[2][2] * v5;
     }
-
+*/
   protected:
     config_t _cfg;
     bool _inited = false;
-    float _affine[6] = {1,0,0,0,1,0};
+//    float _affine[6] = {1,0,0,0,1,0};
   };
 /*
   struct Touch_NULL : public ITouch

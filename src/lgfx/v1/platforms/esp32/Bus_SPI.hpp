@@ -80,7 +80,7 @@ namespace lgfx
     void wait(void) override;
     bool busy(void) const override;
 
-    void writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
+    bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
     void writePixels(pixelcopy_t* pc, std::uint32_t length) override;
@@ -94,7 +94,7 @@ namespace lgfx
     void beginRead(void) override;
     void endRead(void) override;
     std::uint32_t readData(std::uint_fast8_t bit_length) override;
-    void readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
+    bool readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma) override;
     void readPixels(void* dst, pixelcopy_t* pc, std::uint32_t length) override;
 
   private:

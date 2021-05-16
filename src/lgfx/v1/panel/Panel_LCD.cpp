@@ -111,6 +111,7 @@ namespace lgfx
   {
     r &= 7;
     _rotation = r;
+    // offset_rotationを加算 (0~3:回転方向、 4:上下反転フラグ)
     _internal_rotation = ((r + _cfg.offset_rotation) & 3) | ((r & 4) ^ (_cfg.offset_rotation & 4));
 
     auto ox = _cfg.offset_x;
@@ -130,7 +131,7 @@ namespace lgfx
     _colstart = (_internal_rotation & 2)
               ? mw - (pw + ox) : ox;
 
-    _rowstart = (((((_internal_rotation >> 1) & 2) + _internal_rotation) + 1) & 2)
+    _rowstart = ((1 << _internal_rotation) & 0b10010110) // case 1:2:4:7
               ? mh - (ph + oy) : oy;
 
     _xs = _xe = _ys = _ye = INT16_MAX;
@@ -215,15 +216,8 @@ namespace lgfx
     bool tr = _in_transaction;
     if (!tr) begin_transaction();
 
-    if (!_cfg.dlen_16bit)
-    {
-      set_window_8(x, y, x, y, CMD_RAMWR);
-    }
-    else
-    {
-      set_window_16(x, y, x, y, CMD_RAMWR);
-      _align_data = _write_bits & 15;
-    }
+    setWindow(x,y,x,y);
+    if (_cfg.dlen_16bit) { _align_data = (_write_bits & 15); }
     _bus->writeData(rawcolor, _write_bits);
 
     if (!tr) end_transaction();
@@ -234,15 +228,9 @@ namespace lgfx
     std::uint32_t len = w * h;
     std::uint_fast16_t xe = w + x - 1;
     std::uint_fast16_t ye = y + h - 1;
-    if (!_cfg.dlen_16bit)
-    {
-      set_window_8(x, y, xe, ye, CMD_RAMWR);
-    }
-    else
-    {
-      set_window_16(x, y, xe, ye, CMD_RAMWR);
-      _align_data = (_write_bits & 15) && (len & 1);
-    }
+
+    setWindow(x,y,xe,ye);
+    if (_cfg.dlen_16bit) { _align_data = (_write_bits & 15) && (len & 1); }
     _bus->writeDataRepeat(rawcolor, _write_bits, len);
   }
 
@@ -309,14 +297,38 @@ namespace lgfx
       }
       else
       {
+/*
         if (!_bus->busy() && (h == 1 || (param->src_bitwidth == w && w * h <= INT16_MAX)))
         {
           setWindow(x, y, x + w - 1, y + h - 1);
           writePixels(param, w * h);
         }
-        else
+//
+        if (h == 1 || (param->src_bitwidth == w && w * h <= INT16_MAX))
         {
-          std::int32_t wb = w * bytes;
+          std::size_t length = w * h;
+          std::size_t limit = (bytes == 2) ? 64 : 48;
+//        std::size_t len = ((wh - 1) % limit) + 1;
+          std::size_t len = (limit << 1) <= length ? limit : length;
+          limit <<= 1;
+          auto buf = _bus->getDMABuffer(len * bytes);
+          param->fp_copy(buf, 0, len, param);
+          setWindow(x, y, x + w - 1, y + h - 1);
+          write_bytes(buf, len * bytes, true);
+          while (length -= len)
+          {
+//            len = ((wh - 1) % limit) + 1;
+            len = (limit << 1) <= length ? limit : length;
+            if (limit <= 256) limit <<= 1;
+            auto buf = _bus->getDMABuffer(len * bytes);
+            param->fp_copy(buf, 0, len, param);
+            write_bytes(buf, len * bytes, true);
+          }
+        }
+        else
+//*/
+        {
+          std::size_t wb = w * bytes;
           auto buf = _bus->getDMABuffer(wb);
           param->fp_copy(buf, 0, w, param);
           setWindow(x, y, x + w - 1, y + h - 1);

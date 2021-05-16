@@ -83,29 +83,23 @@ namespace lgfx
     if (_buf) heap_free(_buf);
     _buf = static_cast<std::uint8_t*>(heap_alloc_dma(len));
     memset(_buf, 0, len);
-
     startWrite(true);
 
-    _bus->writeBytes(_buf, len, true, true);
-
-    for (std::uint8_t i = 0; auto cmds = getInitCommands(i); i++)
+    for (std::size_t i = 0; auto cmds = getInitCommands(i); i++)
     {
       std::size_t idx = 0;
-      while (cmds[idx] != 0xFF && cmds[idx + 1] != 0xFF) ++idx;
-      if (idx)
-      _bus->writeBytes(cmds, idx, false, false);
+      while (cmds[idx] != 0xFF || cmds[idx + 1] != 0xFF) ++idx;
+      if (idx) { _bus->writeBytes(cmds, idx, false, true); }
     }
 
     setInvert(_invert);
-
     setRotation(_rotation);
+    endWrite();
 
     _range_new.top = 0;
     _range_new.left = 0;
     _range_new.right = _width - 1;
     _range_new.bottom = _height - 1;
-
-    endWrite();
   }
 
   void Panel_1bitOLED::setInvert(bool invert)
@@ -350,8 +344,8 @@ namespace lgfx
   void Panel_SSD1306::setBrightness(std::uint8_t brightness)
   {
     startWrite();
-    _bus->writeCommand(CMD_SETPRECHG | ((brightness+15)/17)*0x11 << 8, 16);
-    _bus->writeCommand(CMD_SETVCOMDET | (brightness>>1) << 8, 16);
+    _bus->writeCommand(CMD_SETPRECHARGE | ((brightness+15)/17)*0x11 << 8, 16);
+    _bus->writeCommand(CMD_SETVCOMDETECT | (brightness>>1) << 8, 16);
     _bus->writeCommand(CMD_SETCONTRAST | brightness << 8, 16);
     endWrite();
   }
@@ -374,6 +368,8 @@ namespace lgfx
     std::uint_fast8_t ys = _range_new.top    >> 3;
     std::uint_fast8_t ye = _range_new.bottom >> 3;
     _bus->writeCommand(CMD_PAGEADDR | (ys + (_cfg.offset_y >> 3)) << 8 | (ye + (_cfg.offset_y >> 3)) << 16, 24);
+    _bus->endTransaction();
+    _bus->beginTransaction();
     do
     {
       auto buf = &_buf[xs + ys * _cfg.panel_width];
@@ -390,47 +386,11 @@ namespace lgfx
 
   void Panel_SH110x::init(bool use_reset)
   {
-    Panel_Device::init(use_reset);
+    Panel_1bitOLED::init(use_reset);
 
-    int len = ((_cfg.panel_height + 7) >> 3) * _cfg.panel_width;
-    if (_buf) heap_free(_buf);
-    _buf = static_cast<std::uint8_t*>(heap_alloc_dma(len));
-    memset(_buf, 0, len);
     startWrite(true);
-
-    for (std::uint8_t i = 0; auto cmds = getInitCommands(i); i++)
-    {
-      std::size_t idx = 0;
-      while (cmds[idx] != 0xFF || cmds[idx + 1] != 0xFF) ++idx;
-      if (idx) _bus->writeBytes(cmds, idx, false, false);
-    }
     _bus->writeCommand(CMD_SETMULTIPLEX | (((_cfg.panel_width-1) & 0x7F) << 8), 16);
     _bus->writeCommand(CMD_SETDISPLAYOFFSET | ((uint8_t)(-_cfg.offset_x) << 8), 16);
-
-
-    _bus->writeCommand(0xDA | 0x12<<8, 16);  // for SH1106 set COM pins
-
-//    _bus->writeCommand(CMD_SETMULTIPLEX | 32 << 8, 16);
-//    _bus->writeCommand(CMD_SETDISPLAYOFFSET | (-48&0x7f) << 8, 16);
-//        CMD_SETDISPSTARTLINE  , count    // 0xDC 0x00
-
-/*
-    _bus->writeCommand(0x00, 8);
-    _bus->writeCommand(0x16, 8);
-    _bus->writeCommand(0xDC, 16);
-    _bus->writeCommand(0xA0, 8);
-    _bus->writeCommand(0xC0, 8);
-*/
-    setInvert(_invert);
-    delay(100);
-
-    setRotation(_rotation);
-
-    _range_new.top = 0;
-    _range_new.left = 0;
-    _range_new.right = _width - 1;
-    _range_new.bottom = _height - 1;
-
     endWrite();
   }
 
@@ -468,11 +428,15 @@ namespace lgfx
 
     do
     {
+      //_bus->endTransaction();
+      //_bus->beginTransaction();
       _bus->writeCommand(  CMD_SETPAGEADDR | (ys + offset_y)
                         | (CMD_SETHIGHCOLUMN | (xs >> 4)) << 8
                         | (CMD_SETLOWCOLUMN  | (xs & 0x0F)) << 16
                         , 24);
       auto buf = &_buf[xs + ys * _cfg.panel_width];
+      //_bus->endTransaction();
+      //_bus->beginTransaction();
       _bus->writeBytes(buf, xe - xs + 1, true, true);
     } while (++ys <= ye);
 

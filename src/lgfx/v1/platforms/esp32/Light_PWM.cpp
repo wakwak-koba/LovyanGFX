@@ -33,14 +33,11 @@ namespace lgfx
 
   void Light_PWM::init(std::uint8_t brightness)
   {
-    std::uint8_t duty = brightness;
-    if (_cfg.invert) duty = ~duty;
 
 #ifdef ARDUINO
 
     ledcSetup(_cfg.pwm_channel, _cfg.freq, 8);
     ledcAttachPin(_cfg.pin_bl, _cfg.pwm_channel);
-    ledcWrite(_cfg.pwm_channel, duty);
 
 #else
 
@@ -55,7 +52,7 @@ namespace lgfx
      ledc_channel.channel    = (ledc_channel_t)_cfg.pwm_channel;
      ledc_channel.intr_type  = LEDC_INTR_DISABLE;
      ledc_channel.timer_sel  = (ledc_timer_t)((_cfg.pwm_channel >> 1) & 3);
-     ledc_channel.duty       = duty; // duty;
+     ledc_channel.duty       = _cfg.invert ? 256 : 0;
      ledc_channel.hpoint     = 0;
     };
     ledc_channel_config(&ledc_channel);
@@ -74,19 +71,22 @@ namespace lgfx
 
 #endif
 
+    setBrightness(brightness);
+
   }
 
   void Light_PWM::setBrightness(std::uint8_t brightness)
   {
     if (_cfg.invert) brightness = ~brightness;
+    std::uint32_t duty = brightness + (brightness >> 7);
 
 #ifdef ARDUINO
-    ledcWrite(_cfg.pwm_channel, brightness);
+    ledcWrite(_cfg.pwm_channel, duty);
 #elif SOC_LEDC_SUPPORT_HS_MODE
-    ledc_set_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel, brightness);
+    ledc_set_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel, duty);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel);
 #else
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel, brightness);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)_cfg.pwm_channel);
 #endif
   }

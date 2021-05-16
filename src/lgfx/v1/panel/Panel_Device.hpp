@@ -26,17 +26,13 @@ namespace lgfx
 //----------------------------------------------------------------------------
   struct IBus;
   struct ILight;
+  struct ITouch;
+  struct touch_point_t;
 
   class Panel_Device : public IPanel
   {
   public:
     Panel_Device(void);
-
-    void bus(IBus* bus);
-    inline IBus* bus(void) const { return _bus; }
-
-    inline void setLight(ILight* light) { _light = light; }
-    inline ILight* getLight(void) const { return _light; }
 
     struct config_t
     {
@@ -112,11 +108,34 @@ namespace lgfx
     const config_t& config(void) const { return _cfg; }
     void config(const config_t& cfg) { _cfg = cfg; }
 
+    void initBus(void);
+    void setBus(IBus* bus);
+    void bus(IBus* bus) { setBus(bus); };
+    IBus* getBus(void) const { return _bus; }
+    IBus* bus(void) const { return _bus; }
+
+
+    void setLight(ILight* light) { _light = light; }
+    void light(ILight* light) { _light = light; }
+    ILight* getLight(void) const { return _light; }
+    ILight* light(void) const { return _light; }
+    void setBrightness(std::uint8_t brightness) override;
+
+
+    void setTouch(ITouch* touch);
+    void touch(ITouch* touch) { setTouch(touch); }
+    ITouch* getTouch(void) const { return _touch; }
+    ITouch* touch(void) const { return _touch; }
+    std::uint_fast8_t getTouchRaw(touch_point_t* tp, std::int_fast8_t number);
+    std::uint_fast8_t getTouch(touch_point_t* tp, std::int_fast8_t number);
+    void convertRawXY(std::int32_t *x, std::int32_t *y);
+    void touchCalibrate(void);
+    void setCalibrateAffine(float affine[6]);
+    void setCalibrate(std::uint16_t *parameters);
+
 
     bool isReadable(void) const override { return _cfg.readable; }
     bool isBusShared(void) const override { return _cfg.bus_shared; }
-
-    void setBrightness(std::uint8_t brightness) override;
 
     void init(bool use_reset) override;
     void initDMA(void) override;
@@ -136,8 +155,11 @@ namespace lgfx
 
     IBus* _bus = nullptr;
     ILight* _light = nullptr;
+    ITouch* _touch = nullptr;
     bool _align_data = false;
     std::uint8_t _internal_rotation = 0;
+
+    float _affine[6] = {1,0,0,0,1,0};  /// touch affine parameter
 
     /// Performs preparation processing for the CS pin.
     /// If you want to control the CS pin on your own, override this function and implement it.

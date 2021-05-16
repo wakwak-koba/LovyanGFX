@@ -61,6 +61,7 @@ namespace lgfx
 
   protected:
 
+    static constexpr std::uint8_t CMD_SETSTARTLINE        = 0x40;
     static constexpr std::uint8_t CMD_DISPLAYALLON_RESUME = 0xA4;
     static constexpr std::uint8_t CMD_DISPLAYALLON        = 0xA5;
     static constexpr std::uint8_t CMD_NORMALDISPLAY       = 0xA6;
@@ -68,10 +69,12 @@ namespace lgfx
     static constexpr std::uint8_t CMD_SETMULTIPLEX        = 0xA8;
     static constexpr std::uint8_t CMD_DISP_OFF            = 0xAE;
     static constexpr std::uint8_t CMD_DISP_ON             = 0xAF;
+    static constexpr std::uint8_t CMD_SETPRECHARGE        = 0xD9;
+    static constexpr std::uint8_t CMD_SETVCOMDETECT       = 0xDB;
 
     std::uint8_t* _buf = nullptr;
 
-    rect16_t _range_new;
+    range_rect_t _range_new;
     std::int32_t _xpos = 0;
     std::int32_t _ypos = 0;
 
@@ -83,7 +86,7 @@ namespace lgfx
 
   struct Panel_SSD1306 : public Panel_1bitOLED
   {
-    Panel_SSD1306(void) : Panel_1bitOLED()
+    Panel_SSD1306(void)
     {
       _cfg.memory_width  = _cfg.panel_width  = 128;
       _cfg.memory_height = _cfg.panel_height = 64;
@@ -100,7 +103,6 @@ namespace lgfx
     static constexpr std::uint8_t CMD_COLUMNADDR  = 0x21;
     static constexpr std::uint8_t CMD_PAGEADDR    = 0x22;
 
-    static constexpr std::uint8_t CMD_SETSTARTLINE= 0x40;
     static constexpr std::uint8_t CMD_SETCONTRAST = 0x81;
     static constexpr std::uint8_t CMD_CHARGEPUMP  = 0x8D;
     static constexpr std::uint8_t CMD_SEGREMAP    = 0xA0;
@@ -109,32 +111,30 @@ namespace lgfx
 //  static constexpr std::uint8_t CMD_COMSCANDEC  = 0xC8;
     static constexpr std::uint8_t CMD_SETOFFSET   = 0xD3;
     static constexpr std::uint8_t CMD_SETCLKDIV   = 0xD5;
-    static constexpr std::uint8_t CMD_SETPRECHG   = 0xD9;
     static constexpr std::uint8_t CMD_SETCOMPINS  = 0xDA;
-    static constexpr std::uint8_t CMD_SETVCOMDET  = 0xDB;
 
     static constexpr std::uint8_t CMD_DEACTIVATE_SCROLL   = 0x2E;
 
     const std::uint8_t* getInitCommands(std::uint8_t listno) const override
     {
       static constexpr std::uint8_t list0[] = {
-          CMD_DISP_OFF           ,
-          CMD_SETCLKDIV          , 0x80,
-          CMD_SETMULTIPLEX       , 0x3F,
-          CMD_SETOFFSET          , 0x00,
-          CMD_SETSTARTLINE       ,
-          CMD_MEMORYMODE         , 0x00,
-          CMD_SEGREMAP           ,
-          CMD_COMSCANINC         ,
-          CMD_SETCOMPINS         , 0x12,
-          CMD_SETVCOMDET         , 0x10,
-          CMD_DISPLAYALLON_RESUME,
-          CMD_DEACTIVATE_SCROLL  ,
-          CMD_CHARGEPUMP         , 0x14,
-          CMD_DISP_ON            ,
-          CMD_SETCONTRAST        , 0x00,
-          CMD_SETPRECHG          , 0x11,
-          0xFF,0xFF, // end
+        CMD_DISP_OFF           ,
+        CMD_SETCLKDIV          , 0x80,
+        CMD_SETMULTIPLEX       , 0x3F,
+        CMD_SETOFFSET          , 0x00,
+        CMD_SETSTARTLINE       ,
+        CMD_MEMORYMODE         , 0x00,
+        CMD_SEGREMAP           ,
+        CMD_COMSCANINC         ,
+        CMD_SETCOMPINS         , 0x12,
+        CMD_SETVCOMDETECT      , 0x10,
+        CMD_DISPLAYALLON_RESUME,
+        CMD_DEACTIVATE_SCROLL  ,
+        CMD_CHARGEPUMP         , 0x14,
+        CMD_DISP_ON            ,
+        CMD_SETCONTRAST        , 0x00,
+        CMD_SETPRECHARGE          , 0x11,
+        0xFF,0xFF, // end
       };
       switch (listno) {
       case 0: return list0;
@@ -143,7 +143,7 @@ namespace lgfx
     }
   };
 
-  struct Panel_SH110x : public Panel_SSD1306
+  struct Panel_SH110x : public Panel_1bitOLED
   {
     Panel_SH110x(void)
     {
@@ -173,9 +173,7 @@ namespace lgfx
     static constexpr std::uint8_t CMD_COMSCANDEC          = 0xC8;
     static constexpr std::uint8_t CMD_SETDISPLAYOFFSET    = 0xD3;
     static constexpr std::uint8_t CMD_SETDISPLAYCLOCKDIV  = 0xD5;
-    static constexpr std::uint8_t CMD_SETPRECHARGE        = 0xD9;
     static constexpr std::uint8_t CMD_SETCOMPINS          = 0xDA;
-    static constexpr std::uint8_t CMD_SETVCOMDETECT       = 0xDB;
     static constexpr std::uint8_t CMD_SETDISPSTARTLINE    = 0xDC;
     static constexpr std::uint8_t CMD_SETLOWCOLUMN        = 0x00;
     static constexpr std::uint8_t CMD_SETHIGHCOLUMN       = 0x10;
@@ -186,39 +184,21 @@ namespace lgfx
     {
       static constexpr std::uint8_t list0[] = {
         CMD_DISP_OFF   ,
+        CMD_SETSTARTLINE       ,
         CMD_READMODIFYWRITE_END,
         CMD_PAGEADDRESSINGMODE ,
         CMD_SETDISPSTARTLINE   , 0x00,
         CMD_SETDISPLAYCLOCKDIV , 0x50,
-        CMD_DCDC               , 0x8A,
+        CMD_DCDC               , 0x8B,
         CMD_SEGREMAP           ,
         CMD_COMSCANINC         ,
         CMD_SETPRECHARGE       , 0x20,
         CMD_SETVCOMDETECT      , 0x35,
         CMD_DISPLAYALLON_RESUME,
         CMD_SETCONTRAST, 0x00,
+        CMD_SETCOMPINS, 0x12,
         CMD_DISP_ON    ,
-/*
-//
-
-CMD_INVERTDISPLAY ,
-
-          0xd5, 0x51,
-          CMD_PAGEADDRESSINGMODE,
-          CMD_SETCONTRAST       , 0x4F,
-          0xAD, 0x8A,
-          0xA0, 
-          0xC0, 
-          0xDC, 0x00,
-          0xd3, 0x60,
-          0xd9, 0x22,
-          0xdb, 0x35,
-          0xa8, 0x3f,
-          0xa4, 
-          0xa6, 
-CMD_DISPLAYON,
-//*/
-          0xFF,0xFF, // end
+        0xFF,0xFF, // end
       };
       switch (listno) {
       case 0: return list0;

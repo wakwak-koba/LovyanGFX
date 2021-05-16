@@ -25,11 +25,13 @@ Contributors:
 #include "v1/LGFXBase.hpp"
 #include "v1/LGFX_Sprite.hpp"
 #include "v1/Light.hpp"
+#include "v1/panel/Panel_GC9A01.hpp"
 #include "v1/panel/Panel_ILI9163.hpp"
 #include "v1/panel/Panel_ILI9225.hpp"
 #include "v1/panel/Panel_ILI9341.hpp"
 #include "v1/panel/Panel_ILI9342.hpp"
 #include "v1/panel/Panel_ILI948x.hpp"
+#include "v1/panel/Panel_RA8875.hpp"
 #include "v1/panel/Panel_SSD1306.hpp"
 #include "v1/panel/Panel_SSD1331.hpp"
 #include "v1/panel/Panel_SSD1351.hpp"
@@ -41,6 +43,6 @@ Contributors:
 #include "v1/panel/Panel_IT8951.hpp"
 #include "v1/touch/Touch_FT5x06.hpp"
 #include "v1/touch/Touch_GT911.hpp"
-
-using LovyanGFX = lgfx::LovyanGFX;
+#include "v1/touch/Touch_STMPE610.hpp"
+#include "v1/touch/Touch_XPT2046.hpp"
 
