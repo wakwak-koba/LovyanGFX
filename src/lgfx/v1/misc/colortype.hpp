@@ -689,24 +689,31 @@ namespace lgfx
 
   struct color_conv_t
   {
+    union
+    {
+      color_depth_t depth = rgb565_2Byte;
+      struct
+      {
+        std::uint8_t bits  ;
+        std::uint8_t attrib;
+      };
+    };
     std::uint32_t (*convert_argb8888)(std::uint32_t)=convert_rgb888_to_swap565;
     std::uint32_t (*convert_bgr888)(std::uint32_t) = convert_bgr888_to_swap565;
     std::uint32_t (*convert_rgb888)(std::uint32_t) = convert_rgb888_to_swap565;
     std::uint32_t (*convert_rgb565)(std::uint32_t) = convert_rgb565_to_swap565;
     std::uint32_t (*convert_rgb332)(std::uint32_t) = convert_rgb332_to_swap565;
-    color_depth_t depth = rgb565_2Byte;
     std::uint32_t colormask = 0xFFFF;
     std::uint8_t bytes  = 2;
-    std::uint8_t bits   = 16;
     std::uint8_t x_mask = 0;
 
-    color_conv_t() = default;
-    color_conv_t(const color_conv_t&) = default;
+    // constexpr color_conv_t() = default;
+    // constexpr color_conv_t(const color_conv_t&) = default;
 
     void setColorDepth(color_depth_t depth, bool has_palette = false)
     {
       x_mask = 0;
-      bits = depth & color_depth_t::bit_mask;
+      //bits = depth & color_depth_t::bit_mask;
       has_palette = has_palette || (depth & color_depth_t::has_palette);
 
       if (depth != rgb666_3Byte)
@@ -808,4 +815,4 @@ namespace lgfx
  }
 }
 
-using RGBColor = lgfx::bgr888_t;
+using RGBColor = lgfx::v1::bgr888_t;

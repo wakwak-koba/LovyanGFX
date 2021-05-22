@@ -143,6 +143,7 @@ namespace lgfx
       }
       if (ms)
       {
+        _bus->flush();
         ms = *addr++;        // Read post-command delay time (ms)
         delay( (ms==255 ? 500 : ms) );
       }

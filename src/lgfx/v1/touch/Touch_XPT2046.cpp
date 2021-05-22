@@ -57,7 +57,7 @@ namespace lgfx
     if (!_inited || number != 0) return 0;
     if (!isSPI()) return 0;
 
-    int xt[24], yt[24];
+    int xt[24], yt[24], size[21];
     uint8_t data[61];
     for (int i = 0; i < 3; ++i)
     {
@@ -76,27 +76,35 @@ namespace lgfx
       spi::endTransaction(_cfg.spi_host);
       lgfx::gpio_hi(_cfg.pin_cs);
 
-      for (std::size_t j = 0; j < 7; ++j) {
+      for (std::size_t j = 0; j < 7; ++j)
+      {
         int tmp = 0xFFF
-             + (data[5 + j * 8] << 5 | data[6 + j * 8] >> 3)
-             - (data[7 + j * 8] << 5 | data[8 + j * 8] >> 3);
-        if (tmp < threshold) return 0;
+                + (data[5 + j * 8] << 5 | data[6 + j * 8] >> 3)
+                - (data[7 + j * 8] << 5 | data[8 + j * 8] >> 3);
+        size[i * 7 + j] = std::max(0, tmp);
       }
-      for (std::size_t j = 0; j < 8; ++j) {
+      for (std::size_t j = 0; j < 8; ++j)
+      {
         xt[i * 8 + j] = data[1 + j * 8] << 5 | data[2 + j * 8] >> 3;
         yt[i * 8 + j] = data[3 + j * 8] << 5 | data[4 + j * 8] >> 3;
       }
     }
 
-    if (tp) {
-      std::sort(xt, xt+24);
-      tp->x = (xt[10]+xt[11]+xt[12]+xt[13]) >> 2;
-      std::sort(yt, yt+24);
-      tp->y = (yt[10]+yt[11]+yt[12]+yt[13]) >> 2;
+    std::sort(xt, xt+24);
+    tp->x = (xt[10]+xt[11]+xt[12]+xt[13]) >> 2;
 
-      tp->size = 1;
-    }
-    return 1;
+    std::sort(yt, yt+24);
+    tp->y = (yt[10]+yt[11]+yt[12]+yt[13]) >> 2;
+
+    std::sort(size, size+21);
+    tp->size = std::max(0,
+                        0
+                        + size[10]
+                        + (tp->y * ((_cfg.x_max - tp->x) >> 4) >> 9) // 座標による感度の差を補正(LoLIN D32 Proで調整)
+                        - threshold
+                        ) >> 8;
+
+    return tp->size ? 1 : 0;
   }
 
 //----------------------------------------------------------------------------

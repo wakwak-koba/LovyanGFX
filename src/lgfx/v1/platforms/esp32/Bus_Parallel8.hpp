@@ -77,6 +77,7 @@ namespace lgfx
     void wait(void) override;
     bool busy(void) const override;
 
+    void flush(void) override;
     bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;
@@ -85,7 +86,7 @@ namespace lgfx
 
     void initDMA(void) override {}
     void addDMAQueue(const std::uint8_t* data, std::uint32_t length) override { writeBytes(data, length, true, true); }
-    void execDMAQueue(void) override {};
+    void execDMAQueue(void) override { flush(); };
     std::uint8_t* getDMABuffer(std::uint32_t length) override { return _flip_buffer.getBuffer(length); }
 
     void beginRead(void) override;
@@ -96,33 +97,29 @@ namespace lgfx
 
   private:
 
+    static constexpr std::size_t CACHE_SIZE = 260;
+    static constexpr std::size_t CACHE_THRESH = 256;
+    // static constexpr std::size_t CACHE_SIZE = 68;
+    // static constexpr std::size_t CACHE_THRESH = 64;
+
     config_t _cfg;
-    FlipBuffer _flip_buffer;
-
-    void switch_rate(bool flg_32bit, bool flg_dma);
-    void wait_i2s(void);
-
+    SimpleBuffer _flip_buffer;
+    std::size_t _div_num;
+    std::size_t _cache_index;
+    std::uint16_t _cache[2][CACHE_SIZE];
+    std::uint16_t* _cache_flip;
+    
+    void _wait(void);
     void _init_pin(void);
-    void _alloc_dmadesc(size_t len);
+    std::size_t _flush(std::size_t idx, bool force = false);
     std::uint_fast8_t _reg_to_value(std::uint32_t raw_value);
 
     std::uint32_t _last_freq_apb;
     std::uint32_t _clkdiv_write;
-    std::uint32_t _dmadesc_len;
-    lldesc_t* _dmadesc;
+    i2s_dev_t *_dev;
+    lldesc_t _dmadesc;
 
-    enum sendmode_t
-    {
-      sendmode_32bit_nodma = 0,
-      sendmode_16bit_nodma = 1,
-      sendmode_16bit_dma = 2,
-    };
-    sendmode_t sendmode = sendmode_t::sendmode_32bit_nodma;
-    volatile std::uint32_t* _i2s_sample_rate_conf_reg;
-    volatile std::uint32_t* _i2s_fifo_conf_reg;
     volatile std::uint32_t* _i2s_fifo_wr_reg;
-    volatile std::uint32_t* _i2s_state_reg;
-    volatile std::uint32_t* _i2s_conf_reg;
   };
 
 //----------------------------------------------------------------------------

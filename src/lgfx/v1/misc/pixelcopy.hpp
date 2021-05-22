@@ -54,7 +54,7 @@ namespace lgfx
     std::uint32_t src_bitwidth = 0;
     std::uint32_t src_width = 0;
     std::uint32_t src_height = 0;
-    std::uint32_t transp   = ~0u;
+    std::uint32_t transp   = 1 << 24u; // A1 R0 G0 B0
     std::uint32_t src_bits = 8;
     std::uint32_t dst_bits = 8;
     const void* src_data = nullptr;
@@ -74,7 +74,7 @@ namespace lgfx
                , color_depth_t src_depth
                , bool dst_palette = false
                , const void* src_palette = nullptr
-               , std::uint32_t src_transp = ~0u
+               , std::uint32_t src_transp = 1 << 24u
                )
     : transp    ( src_transp )
 /*

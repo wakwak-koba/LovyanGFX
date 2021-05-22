@@ -49,6 +49,7 @@ namespace lgfx
 
     bool _check_init(void);
     bool _write_reg(std::uint8_t reg, std::uint8_t val);
+
     bool _read_reg(std::uint8_t reg, std::uint8_t *data, std::size_t length);
   };
 

@@ -68,6 +68,7 @@ namespace lgfx
     void wait(void) override;
     bool busy(void) const override;
 
+    void flush(void) override {}
     bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override;
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override;

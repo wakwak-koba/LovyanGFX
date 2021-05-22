@@ -27,6 +27,7 @@ namespace lgfx
 
   static constexpr std::uint8_t FT5x06_VENDID_REG = 0xA8;
   static constexpr std::uint8_t FT5x06_POWER_REG  = 0x87;
+  static constexpr std::uint8_t FT5x06_PERIODACTIVE = 0x88;
   static constexpr std::uint8_t FT5x06_INTMODE_REG= 0xA4;
 
   static constexpr std::uint8_t FT5x06_MONITOR  = 0x01;
@@ -34,15 +35,15 @@ namespace lgfx
 
   bool Touch_FT5x06::_write_reg(std::uint8_t reg, std::uint8_t val)
   {
-    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq);
-    std::uint8_t data[] = { reg, val };
-    return lgfx::i2c::writeBytes(_cfg.i2c_port, data, 2)
-        && lgfx::i2c::endTransaction(_cfg.i2c_port);
+    return i2c::registerWrite8(_cfg.i2c_port, _cfg.i2c_addr, reg, val, 0, _cfg.freq).has_value();
+
+    // std::uint8_t data[] = { reg, val };
+    // return lgfx::i2c::transactionWrite(_cfg.i2c_port, _cfg.i2c_addr, data, 2, _cfg.freq).has_value();
   }
 
   bool Touch_FT5x06::_read_reg(std::uint8_t reg, std::uint8_t *data, std::size_t length)
   {
-    return lgfx::i2c::readRegister(_cfg.i2c_port, _cfg.i2c_addr, reg, data, length, _cfg.freq);
+    return lgfx::i2c::transactionWriteRead(_cfg.i2c_port, _cfg.i2c_addr, &reg, 1, data, length, _cfg.freq).has_value();
   }
 
   bool Touch_FT5x06::_check_init(void)
@@ -68,6 +69,7 @@ namespace lgfx
     {
       lgfx::pinMode(_cfg.pin_int, pin_mode_t::input_pullup);
     }
+
     return true;
   }
 
@@ -100,26 +102,28 @@ namespace lgfx
       }
     }
 
-    std::uint_fast16_t tx, ty;
-    std::int32_t retry = 3;
-    std::uint32_t base = number * 6;
-    std::uint8_t tmp[base + 5];
-    do
-    {
-      _read_reg(0x02, tmp, 5 + base);
-      if (number >= tmp[0]) return 0;
-      tx = (tmp[base + 1] & 0x0F) << 8 | tmp[base + 2];
-      ty = (tmp[base + 3] & 0x0F) << 8 | tmp[base + 4];
-    } while ((tx > _cfg.x_max || ty > _cfg.y_max) && --retry);
+    std::size_t base = number * 6;
+    std::size_t len = base + 5;
 
+    std::uint8_t tmp[2][len];
+    _read_reg(0x02, tmp[0], len);
+    std::int32_t retry = 5;
+    do
+    { // 読出し中に値が変わる事があるので、連続読出しして前回と同値でなければリトライする
+      _read_reg(0x02, tmp[retry & 1], len);
+    } while (memcmp(tmp[0], tmp[1], len) && --retry);
+
+    if (number >= tmp[0][0]) return 0;
+  
     if (tp)
     {
-      tp->x = tx;
-      tp->y = ty;
-      tp->id = tmp[base + 3] >> 4;
+      auto data = &tmp[0][base];
       tp->size = 1;
+      tp->x = (data[1] & 0x0F) << 8 | data[2];
+      tp->y = (data[3] & 0x0F) << 8 | data[4];
+      tp->id = data[3] >> 4;
     }
-    return tmp[0];
+    return tmp[0][0];
   }
 
 //----------------------------------------------------------------------------

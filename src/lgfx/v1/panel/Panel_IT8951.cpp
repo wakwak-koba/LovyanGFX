@@ -438,10 +438,9 @@ IT8951 Registers defines
 
   void Panel_IT8951::drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor)
   {
-    bool need_transaction = !getStartCount();
-    if (need_transaction) startWrite();
+    startWrite();
     writeFillRectPreclipped(x, y, 1, 1, rawcolor);
-    if (need_transaction) endWrite();
+    endWrite();
   }
 
   void Panel_IT8951::writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor)

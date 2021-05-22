@@ -206,38 +206,50 @@ namespace lgfx
 
   enum color_depth_t : std::uint16_t
   {
-////alternate           = 0x0040   ,
-    bit_mask            = 0x003F   ,
-    has_palette         = 0x8000   ,
-    non_swapped         = 0x0100   ,
+    bit_mask            = 0x00FF   ,
+    has_palette         = 0x0100   ,
+    grayscale           = 0x0200   ,
+    alphachannel        = 0x0400   ,
+    alternate           = 0x0800   ,
+    non_swapped         = 0x1000   ,
 
-    grayscale_1bit      =         1, //                            _______L
-    grayscale_2bit      =         2, //                            ______LL
-    grayscale_4bit      =         4, //                            ____LLLL
-    grayscale_1Byte     = 0x0040| 8, // ________ ________ ________ LLLLLLLL
-    palette_1bit        = 0x8000| 1, //                            _______I   2 color
-    palette_2bit        = 0x8000| 2, //                            ______II   4 color
-    palette_4bit        = 0x8000| 4, //                            ____IIII  16 color
-    palette_8bit        = 0x8000| 8, //                            IIIIIIII 256 color
-    rgb332_1Byte        =         8, // ________ ________ ________ RRRGGGBB
-    rgb565_2Byte        =        16, // ________ ________ GGGBBBBB RRRRRGGG
-    rgb666_3Byte        = 0x0040|24, // ________ __BBBBBB __GGGGGG __RRRRRR
-    rgb888_3Byte        =        24, // ________ BBBBBBBB GGGGGGGG RRRRRRRR
-    argb8888_4Byte      =        32, // BBBBBBBB GGGGGGGG RRRRRRRR AAAAAAAA
-    rgb565_nonswapped   = 0x0100|16, // ________ ________ RRRRRGGG GGGBBBBB
-    rgb666_nonswapped   = 0x0140|24, // ________ __RRRRRR __GGGGGG __BBBBBB
-    rgb888_nonswapped   = 0x0100|24, // ________ RRRRRRRR GGGGGGGG BBBBBBBB
-    argb8888_nonswapped = 0x0100|32, // AAAAAAAA RRRRRRRR GGGGGGGG BBBBBBBB
+    grayscale_1bit      =   1 | grayscale               , //                            _______L
+    grayscale_2bit      =   2 | grayscale               , //                            ______LL
+    grayscale_4bit      =   4 | grayscale               , //                            ____LLLL
+    grayscale_1Byte     =   8 | grayscale               , // ________ ________ ________ LLLLLLLL
+    palette_1bit        =   1 | has_palette             , //                            _______I   2 color
+    palette_2bit        =   2 | has_palette             , //                            ______II   4 color
+    palette_4bit        =   4 | has_palette             , //                            ____IIII  16 color
+    palette_8bit        =   8 | has_palette             , //                            IIIIIIII 256 color
+    rgb332_1Byte        =   8                           , // ________ ________ ________ RRRGGGBB
+    rgb565_2Byte        =  16                           , // ________ ________ GGGBBBBB RRRRRGGG
+    rgb666_3Byte        =  24 |               alternate , // ________ __BBBBBB __GGGGGG __RRRRRR
+    rgb888_3Byte        =  24                           , // ________ BBBBBBBB GGGGGGGG RRRRRRRR
+    argb8888_4Byte      =  32                           , // BBBBBBBB GGGGGGGG RRRRRRRR AAAAAAAA
+    rgb565_nonswapped   =  16 | non_swapped             , // ________ ________ RRRRRGGG GGGBBBBB
+    rgb666_nonswapped   =  24 | non_swapped | alternate , // ________ __RRRRRR __GGGGGG __BBBBBB
+    rgb888_nonswapped   =  24 | non_swapped             , // ________ RRRRRRRR GGGGGGGG BBBBBBBB
+    argb8888_nonswapped =  32 | non_swapped             , // AAAAAAAA RRRRRRRR GGGGGGGG BBBBBBBB
 //*/
+  };
+
+//----------------------------------------------------------------------------
+
+  enum error_t
+  { unknown_err
+  , invalid_arg         // 引数が範囲外等でinvalidな場合のエラー
+  , connection_lost     // 通信が切断されたり正しく行えない場合のエラー
+  , mode_mismatch       // I2C通信が書込みモード時に読込みを指示するなど不一致な操作を行った場合のエラー
+  , periph_device_err   // ペリフェラルが動作していない等のエラー
   };
 
 //----------------------------------------------------------------------------
  }
 }
 
-using namespace lgfx::jpeg_div;
-using namespace lgfx::colors;
-using namespace lgfx::textdatum;
-using namespace lgfx::datum;
-using namespace lgfx::attribute;
-using namespace lgfx::epd_mode;
+using namespace lgfx::v1::jpeg_div;
+using namespace lgfx::v1::colors;
+using namespace lgfx::v1::textdatum;
+using namespace lgfx::v1::datum;
+using namespace lgfx::v1::attribute;
+using namespace lgfx::v1::epd_mode;

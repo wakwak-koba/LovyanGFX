@@ -28,17 +28,18 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  //#define SAFE_I2S_FIFO_WR_REG(i) (0x6000F000 + ((i)*0x1E000))
-  //#define SAFE_I2S_FIFO_RD_REG(i) (0x6000F004 + ((i)*0x1E000))
+  // #define SAFE_I2S_FIFO_WR_REG(i) (0x6000F000 + ((i)*0x1E000))
+  // #define SAFE_I2S_FIFO_RD_REG(i) (0x6000F004 + ((i)*0x1E000))
   #define SAFE_I2S_FIFO_WR_REG(i) (0x3FF4F000 + ((i)*0x1E000))
   #define SAFE_I2S_FIFO_RD_REG(i) (0x3FF4F004 + ((i)*0x1E000))
 
   static constexpr std::uint32_t _conf_reg_default = I2S_TX_MSB_RIGHT | I2S_TX_RIGHT_FIRST | I2S_RX_RIGHT_FIRST;
   static constexpr std::uint32_t _conf_reg_start   = _conf_reg_default | I2S_TX_START;
+  static constexpr std::uint32_t _conf_reg_reset   = _conf_reg_default | I2S_TX_RESET;
   static constexpr std::uint32_t _sample_rate_conf_reg_32bit = 32 << I2S_TX_BITS_MOD_S | 32 << I2S_RX_BITS_MOD_S | 1 << I2S_TX_BCK_DIV_NUM_S | 1 << I2S_RX_BCK_DIV_NUM_S;
   static constexpr std::uint32_t _sample_rate_conf_reg_16bit = 16 << I2S_TX_BITS_MOD_S | 16 << I2S_RX_BITS_MOD_S | 1 << I2S_TX_BCK_DIV_NUM_S | 1 << I2S_RX_BCK_DIV_NUM_S;
   static constexpr std::uint32_t _fifo_conf_default = 1 << I2S_TX_FIFO_MOD | 1 << I2S_RX_FIFO_MOD | 32 << I2S_TX_DATA_NUM_S | 32 << I2S_RX_DATA_NUM_S;
-  static constexpr std::uint32_t _fifo_conf_dma     = 1 << I2S_TX_FIFO_MOD | 1 << I2S_RX_FIFO_MOD | 32 << I2S_TX_DATA_NUM_S | 32 << I2S_RX_DATA_NUM_S | I2S_DSCR_EN;
+  static constexpr std::uint32_t _fifo_conf_dma     = _fifo_conf_default | I2S_DSCR_EN;
 
   static __attribute__ ((always_inline)) inline volatile std::uint32_t* reg(std::uint32_t addr) { return (volatile std::uint32_t *)ETS_UNCACHED_ADDR(addr); }
 
@@ -46,13 +47,10 @@ namespace lgfx
   {
     _cfg = cfg;
     auto port = cfg.i2s_port;
+    _dev = (port == 0) ? &I2S0 : &I2S1;
 
-    _i2s_sample_rate_conf_reg = reg(I2S_SAMPLE_RATE_CONF_REG(port));
-    _i2s_fifo_conf_reg        = reg(I2S_FIFO_CONF_REG(port));
-    _i2s_fifo_wr_reg          = reg(SAFE_I2S_FIFO_WR_REG(port));
-    _i2s_state_reg            = reg(I2S_STATE_REG(port));
-    _i2s_conf_reg             = reg(I2S_CONF_REG(port));
-
+    _i2s_fifo_wr_reg = reg(SAFE_I2S_FIFO_WR_REG(port));
+    
     _last_freq_apb = 0;
   }
 
@@ -61,33 +59,24 @@ namespace lgfx
     _init_pin();
 
     //Reset I2S subsystem
-    *reg(I2S_CONF_REG(_cfg.i2s_port)) = I2S_TX_RESET | I2S_RX_RESET | I2S_TX_FIFO_RESET | I2S_RX_FIFO_RESET;
-    *reg(I2S_CONF_REG(_cfg.i2s_port)) = _conf_reg_default;
+    _dev->conf.val = I2S_TX_RESET | I2S_RX_RESET | I2S_TX_FIFO_RESET | I2S_RX_FIFO_RESET;
+    _dev->conf.val = _conf_reg_default;
+
+    _dev->int_ena.val = 0;
+    _dev->timing.val = 0;
 
     //Reset DMA
-    *reg(I2S_LC_CONF_REG(_cfg.i2s_port)) = I2S_IN_RST | I2S_OUT_RST | I2S_AHBM_RST | I2S_AHBM_FIFO_RST;
-    *reg(I2S_LC_CONF_REG(_cfg.i2s_port)) = I2S_OUT_EOF_MODE;
+    _dev->lc_conf.val = I2S_IN_RST | I2S_OUT_RST | I2S_AHBM_RST | I2S_AHBM_FIFO_RST;
+    _dev->lc_conf.val = I2S_OUT_EOF_MODE;
 
-    *reg(I2S_CONF2_REG(_cfg.i2s_port)) = I2S_LCD_EN;
+    _dev->in_link.val = 0;
+    _dev->out_link.val = 0;
 
-    *reg(I2S_CONF1_REG(_cfg.i2s_port))
-          = I2S_TX_PCM_BYPASS
-          | I2S_TX_STOP_EN
-          ;
+    _dev->conf1.val = I2S_TX_PCM_BYPASS | I2S_TX_STOP_EN;
+    _dev->conf2.val = I2S_LCD_EN;
+    _dev->conf_chan.val = 1 << I2S_TX_CHAN_MOD_S | 1 << I2S_RX_CHAN_MOD_S;
 
-    *reg(I2S_CONF_CHAN_REG(_cfg.i2s_port))
-          = 1 << I2S_TX_CHAN_MOD_S
-          | 1 << I2S_RX_CHAN_MOD_S
-          ;
-
-    *reg(I2S_INT_ENA_REG(_cfg.i2s_port)) |= I2S_TX_REMPTY_INT_ENA | I2S_TX_WFULL_INT_ENA | I2S_TX_PUT_DATA_INT_ENA ;
-
-    *reg(I2S_OUT_LINK_REG(_cfg.i2s_port)) = 0;
-    *reg(I2S_IN_LINK_REG(_cfg.i2s_port)) = 0;
-    *reg(I2S_TIMING_REG(_cfg.i2s_port)) = 0;
-
-    _alloc_dmadesc(1);
-    memset(_dmadesc, 0, sizeof(lldesc_t));
+    memset(&_dmadesc, 0, sizeof(lldesc_t));
   }
 
   void Bus_Parallel8::_init_pin(void)
@@ -142,13 +131,6 @@ namespace lgfx
     DPORT_CLEAR_PERI_REG_MASK(DPORT_PERIP_RST_EN_REG, dport_rst);
   }
 
-  void Bus_Parallel8::_alloc_dmadesc(size_t len)
-  {
-    if (_dmadesc) heap_caps_free(_dmadesc);
-    _dmadesc_len = len;
-    _dmadesc = (lldesc_t*)heap_caps_malloc(sizeof(lldesc_t) * len, MALLOC_CAP_DMA);
-  }
-
   void Bus_Parallel8::release(void)
   {  }
 
@@ -160,253 +142,264 @@ namespace lgfx
       _last_freq_apb = freq_apb;
       // clock = 80MHz(apb_freq) / I2S_CLKM_DIV_NUM
       // I2S_CLKM_DIV_NUM 4=20MHz  /  5=16MHz  /  8=10MHz  /  10=8MHz
-      std::uint32_t div_num = std::min(32u, std::max(4u, 1 + (freq_apb / (1 + _cfg.freq_write))));
-      _clkdiv_write =            I2S_CLKA_ENA
-                    |            I2S_CLK_EN
-                    |       1 << I2S_CLKM_DIV_A_S
-                    |       0 << I2S_CLKM_DIV_B_S
-                    | div_num << I2S_CLKM_DIV_NUM_S
+      _div_num = std::min(255u, std::max(3u, 1 + (freq_apb / (1 + _cfg.freq_write))));
+
+      _clkdiv_write =             I2S_CLKA_ENA
+                    |             I2S_CLK_EN
+                    |        1 << I2S_CLKM_DIV_A_S
+                    |        0 << I2S_CLKM_DIV_B_S
+                    | _div_num << I2S_CLKM_DIV_NUM_S
                     ;
     }
     *reg(I2S_CLKM_CONF_REG(_cfg.i2s_port)) = _clkdiv_write;
-    sendmode = sendmode_t::sendmode_32bit_nodma;
-    *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_32bit;
-    *_i2s_fifo_conf_reg = _fifo_conf_default;
+
+    _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+    _dev->fifo_conf.val = _fifo_conf_default;
+
+    _cache_index = 0;
+    _cache_flip = _cache[0];
   }
 
   void Bus_Parallel8::endTransaction(void)
   {
-    wait_i2s();
+    if (_cache_index)
+    {
+      _cache_index = _flush(_cache_index, true);
+    }
+    _wait();
   }
 
-  void Bus_Parallel8::wait_i2s(void)
+  void Bus_Parallel8::_wait(void)
   {
-    auto conf_reg = _conf_reg_default | I2S_TX_RESET | I2S_RX_RESET | I2S_RX_FIFO_RESET;
-    while (!(*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE));
-    *_i2s_conf_reg = conf_reg;
+    //_dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+    auto conf_reg = _conf_reg_default | I2S_TX_RESET;
+    while (!_dev->state.tx_idle)
+    {}
+    _dev->conf.val = conf_reg;
   }
 
   void Bus_Parallel8::wait(void)
   {
-    auto conf_reg = _conf_reg_default | I2S_TX_RESET | I2S_RX_RESET | I2S_RX_FIFO_RESET;
-
-    while (!(*reg(I2S_INT_RAW_REG(_cfg.i2s_port)) & I2S_TX_REMPTY_INT_RAW));
-    *reg(I2S_INT_CLR_REG(_cfg.i2s_port)) = I2S_TX_REMPTY_INT_CLR;
-
-    while (!(*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE));
-    *_i2s_conf_reg = conf_reg;
+    _wait();
   }
 
   bool Bus_Parallel8::busy(void) const
   {
-    return (!(*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE));
+    return !_dev->int_raw.tx_rempty || !_dev->state.tx_idle;
   }
 
+  void Bus_Parallel8::flush(void)
+  {
+    if (_cache_index)
+    {
+      _cache_index = _flush(_cache_index, true);
+    }
+  }
+
+  /// WiFi,BT使用状況確認
+  static bool checkWireless(void)
+  {
+    return *reg(DPORT_WIFI_CLK_EN_REG) & 0x7FF;
+  }
+//*
+// use DMA
+  std::size_t Bus_Parallel8::_flush(std::size_t count, bool force)
+  {
+    bool slow = _div_num > 8;
+
+    std::size_t idx_e = count & ~1;
+
+    if (idx_e)
+    {
+      _dmadesc.buf = (std::uint8_t*)_cache_flip;
+      *(std::uint32_t*)&_dmadesc = idx_e << 1 | idx_e << 13 | 0xC0000000;
+      while (!_dev->state.tx_idle)
+      {}
+      _dev->fifo_conf.val = _fifo_conf_dma;
+      _dev->conf.val = _conf_reg_reset | I2S_TX_FIFO_RESET;
+      _dev->out_link.val = I2S_OUTLINK_START | ((uint32_t)&_dmadesc & I2S_OUTLINK_ADDR);
+      _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+
+      auto cache_old = _cache_flip;
+      _cache_flip = (cache_old == _cache[0]) ? _cache[1] : _cache[0];
+      while (!_dev->state.tx_fifo_reset_back)
+      {}
+
+      // DMAの準備待ちウェイト …無線使用中はウェイトを増やす
+      std::size_t wait = (16 << checkWireless()) + (_div_num >> 2);
+      do { __asm__ __volatile__ ("nop"); } while (--wait);
+      _dev->conf.val = _conf_reg_start;
+      if (slow) while (_dev->state.tx_idle) {}
+      
+      count -= idx_e;
+      if (!count) return 0;
+      
+      //memmove(_cache_flip, &cache_old[idx_e], (count + 1) << 1);
+      _cache_flip[0] = cache_old[idx_e  ];
+      _cache_flip[1] = cache_old[idx_e+1];
+    }
+
+    if (!force)
+    {
+      return count;
+    }
+
+    // ここから DMAで送信しきれなかった端数ぶんの送信処理
+
+//ets_delay_us(2);
+    while (!_dev->state.tx_idle)
+    {}
+    _dev->fifo_conf.val = _fifo_conf_default;
+    _dev->conf.val = _conf_reg_reset;// | I2S_TX_FIFO_RESET;
+    _dev->out_link.val = 0;
+    _dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
+    std::size_t idx = 0;
+    do
+    {
+      *_i2s_fifo_wr_reg = _cache_flip[idx ^ 1] << 16;
+    } while (++idx != count);
+
+    std::size_t wait = (16 << checkWireless()) + (_div_num >> 2);
+    do { __asm__ __volatile__ ("nop"); } while (--wait);
+    if (slow) ets_delay_us(_div_num >> 6);
+    _dev->conf.val = _conf_reg_start;
+    if (slow) while (_dev->state.tx_idle) {}
+//ets_delay_us(2);
+
+    return 0;
+  }
+/*/
+// use FIFO
+  std::size_t Bus_Parallel8::_flush(std::size_t count, bool force)
+  {
+    bool slow = _div_num > 8;
+    while (!_dev->int_raw.tx_rempty || (slow && !_dev->state.tx_idle))
+    {}
+    _dev->conf.val = _conf_reg_reset;
+
+    std::size_t idx_e = std::min(CACHE_THRESH, count & ~3);
+
+    auto cache = _cache_flip;
+
+    if (idx_e)
+    {
+      std::size_t idx = 0;
+      auto c = (std::uint32_t*)cache;
+      do
+      {
+        *_i2s_fifo_wr_reg = c[idx>>1];
+        *_i2s_fifo_wr_reg = c[(idx>>1)+1];
+      } while ((idx += 4) != idx_e);
+      if (slow) ets_delay_us(_div_num >> 6);
+      _dev->conf.val = _conf_reg_start;
+      _dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+
+      count -= idx_e;
+
+      if (!count) return 0;
+
+      memmove(cache, &cache[idx_e], (count + 1) << 1);
+      // idx = 0;
+      // {
+      //   cache[idx] = cache[idx_e + idx];
+      // } while (idx++ != count);
+    }
+    if (!force)
+    {
+      return count;
+    }
+
+    std::size_t idx = 0;
+    while (!_dev->int_raw.tx_rempty || (slow && !_dev->state.tx_idle))
+    {}
+    _dev->conf.val = _conf_reg_reset;
+
+    _dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
+    do
+    {
+      *_i2s_fifo_wr_reg = cache[idx^1] << 16;
+    } while (++idx != count);
+
+    if (slow) ets_delay_us(_div_num >> 6);
+    _dev->conf.val = _conf_reg_start;
+    _dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+    _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+
+    return 0;
+  }
+//*/
   bool Bus_Parallel8::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
-    bit_length = (bit_length + 7) >> 3;
-    wait_i2s();
-    if (sendmode != sendmode_t::sendmode_32bit_nodma)
+    auto idx = _cache_index;
+    auto bytes = bit_length >> 3;
+    auto c = _cache_flip;
+    do
     {
-      sendmode = sendmode_t::sendmode_32bit_nodma;
-      *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_32bit;
-      *_i2s_fifo_conf_reg = _fifo_conf_default;
-    }
-    *_i2s_fifo_wr_reg = (data & 0xFF) << 16;
-    while (--bit_length)
-    {
+      c[idx++ ^ 1] = data & 0xFF;
       data >>= 8;
-      *_i2s_fifo_wr_reg = (data & 0xFF) << 16;
+    } while (--bytes);
+    if (idx >= CACHE_THRESH)
+    {
+      idx = _flush(idx);
     }
-    *_i2s_conf_reg = _conf_reg_start;
+    _cache_index = idx;
     return true;
   }
 
   void Bus_Parallel8::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
   {
-    bit_length = (bit_length + 7) >> 3;
-    wait_i2s();
-    if (sendmode != sendmode_t::sendmode_32bit_nodma)
+    auto idx = _cache_index;
+    auto bytes = bit_length >> 3;
+    auto c = _cache_flip;
+    do
     {
-      sendmode = sendmode_t::sendmode_32bit_nodma;
-      *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_32bit;
-      *_i2s_fifo_conf_reg = _fifo_conf_default;
-    }
-    *_i2s_fifo_wr_reg = (0x100 | data) << 16;
-    while (--bit_length)
-    {
+      c[idx++ ^ 1] = data | 0x100;
       data >>= 8;
-      *_i2s_fifo_wr_reg = (0x100 | data) << 16;
+    } while (--bytes);
+    if (idx >= CACHE_THRESH)
+    {
+      idx = _flush(idx);
     }
-    *_i2s_conf_reg = _conf_reg_start;
+    _cache_index = idx;
   }
 
   void Bus_Parallel8::writeDataRepeat(std::uint32_t color_raw, std::uint_fast8_t bit_length, std::uint32_t length)
   {
-    if (bit_length == 16)
+    std::size_t bytes = bit_length >> 3;
+    std::uint16_t raw[bytes];
+    std::size_t b = 0;
+    do
     {
-      auto conf_start = _conf_reg_start;
-      std::uint32_t data = 0x01000100;
-      data |= color_raw << 16 | color_raw >> 8;
-      std::int32_t limit = ((length - 1) & 31) + 1;
-      if (sendmode != sendmode_t::sendmode_16bit_nodma)
-      {
-        sendmode = sendmode_t::sendmode_16bit_nodma;
-        wait_i2s();
-        *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_16bit;
-        *_i2s_fifo_conf_reg = _fifo_conf_default;
-      }
-//*
-      for (;;)
-      {
-        length -= limit;
-        wait_i2s();
-        do
-        {
-          *_i2s_fifo_wr_reg = data;
-        } while (--limit);
-        *_i2s_conf_reg = conf_start;
-        if (!length) return;
-        limit = 32;
-        std::uint32_t wait = 10;
-        do { __asm__ __volatile__ ("nop"); } while (--wait && (*_i2s_state_reg & I2S_TX_IDLE));
-      }
-      if (!length) return;
-//*/
-//       auto i2s_int_clr_reg = reg(I2S_INT_CLR_REG(_cfg.i2s_port));
-//       auto i2s_int_raw_reg = reg(I2S_INT_RAW_REG(_cfg.i2s_port));
-//       auto i2s_int_st_reg = reg(I2S_INT_ST_REG(_cfg.i2s_port));
-//       auto i2s_fifo_wr_reg = _i2s_fifo_wr_reg;
-//       *i2s_int_clr_reg = I2S_TX_PUT_DATA_INT_RAW | I2S_TX_WFULL_INT_CLR;
-//       bool sended = false;
-// //*
-//       wait_i2s();
-//       limit = std::min(31u, length);
-//       length -= limit;
-//       do
-//       {
-//         *i2s_fifo_wr_reg = data;
-//       } while (--limit);
-//       *_i2s_conf_reg = conf_start;
-//       if (!length) return;
-
-//       std::uint32_t icount = 0;
-//       std::uint32_t wait = 3;
-//       do { __asm__ __volatile__ ("nop"); } while (--wait && (*_i2s_state_reg & I2S_TX_IDLE));
-// //*/
-//       for (;;)
-//       {
-// /*
-//         if (*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE)
-//         {
-//           *_i2s_conf_reg = _conf_reg_default;
-//           limit = std::min(31u, length);
-//           length -= limit;
-//           do
-//           {
-//             *i2s_fifo_wr_reg = data;
-//           } while (--limit);
-//           *_i2s_conf_reg = conf_start;
-//           if (!length) return;
-//           std::uint32_t i = 3;
-//           do { __asm__ __volatile__ ("nop"); } while (--i);
-
-//       //while (*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE);
-
-//           //*_i2s_conf_reg = _conf_reg_default;
-//           //sended = true;
-//           //*_i2s_conf_reg = conf_start;
-//         }
-// //*/
-//         if (!(*i2s_int_raw_reg & I2S_TX_WFULL_INT_ENA))
-//         {
-//           *i2s_fifo_wr_reg = data;
-//           if (0 == --length) break;
-// /*
-// if (*_i2s_state_reg & I2S_TX_IDLE)
-// {
-//   ++icount;
-//   if (icount > 32)
-//   {
-//     icount = 0;
-//           *_i2s_conf_reg = _conf_reg_default;
-//           *_i2s_conf_reg = conf_start;
-//   }
-// } else icount = 0;
-// //*/
-//         }
-//         else
-//         {
-//           *i2s_int_clr_reg = I2S_TX_WFULL_INT_CLR;
-//           *_i2s_conf_reg = _conf_reg_default;
-//           *_i2s_conf_reg = conf_start;
-//           icount = 0;
-//           std::uint32_t wait = 32;
-//           do { __asm__ __volatile__ ("nop"); } while (--wait && (*_i2s_state_reg & I2S_TX_IDLE));
-// //while (!(*i2s_int_raw_reg & I2S_TX_PUT_DATA_INT_RAW));
-//         }
-// /*
-//         if (!sended && !(intraw & I2S_TX_PUT_DATA_INT_ENA))
-//         {
-//           sended = true;
-//           *i2s_int_clr_reg = I2S_TX_PUT_DATA_INT_ENA;
-//           *_i2s_conf_reg = conf_start;
-//         }
-// //*/
-//       }
-//       //ets_delay_us(40);
-//       if (*reg(I2S_STATE_REG(_cfg.i2s_port)) & I2S_TX_IDLE)
-// //      if (!sended)
-//         *_i2s_conf_reg = conf_start;
-//       return;
-    }
-    else
+      raw[b] = color_raw | 0x100;
+      color_raw >>= 8;
+    } while (++b != bytes);
+    auto idx = _cache_index;
+    auto c = _cache_flip;
+    b = 0;
+    for (;;)
     {
-      if (length & 1)
+      c[idx ^ 1] = raw[b];
+      ++idx;
+      if (++b == bytes)
       {
-        writeData(color_raw, bit_length);
-        if (!--length) return;
-      }
-      auto conf_start = _conf_reg_start;
-      static constexpr std::uint32_t data_wr = 0x01000100;
-      std::uint32_t data0 = color_raw << 16 | color_raw >>  8 | data_wr;
-      std::uint32_t data1 = color_raw                         | data_wr;
-      std::uint32_t data2 = color_raw <<  8 | color_raw >> 16 | data_wr;
-      length >>= 1;
-      std::uint32_t limit = ((length - 1) % 10) + 1;
-      if (sendmode != sendmode_t::sendmode_16bit_nodma)
-      {
-        sendmode = sendmode_t::sendmode_16bit_nodma;
-        wait_i2s();
-        *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_16bit;
-        *_i2s_fifo_conf_reg = _fifo_conf_default;
-      }
-      for (;;)
-      {
-        length -= limit;
-
-        wait_i2s();
-        do
+        b = 0;
+        if (idx >= CACHE_THRESH)
         {
-          *_i2s_fifo_wr_reg = data0;
-          *_i2s_fifo_wr_reg = data1;
-          *_i2s_fifo_wr_reg = data2;
-        } while (--limit);
-        *_i2s_conf_reg = conf_start;
-        if (!length) return;
-        limit = 10;
-        std::uint32_t wait = 10;
-        do { __asm__ __volatile__ ("nop"); } while (--wait && (*_i2s_state_reg & I2S_TX_IDLE));
+          idx = _flush(idx);
+          c = _cache_flip;
+        }
+        if (!--length) break;
       }
     }
+    _cache_index = idx;
   }
 
   void Bus_Parallel8::writePixels(pixelcopy_t* param, std::uint32_t length)
   {
-    std::uint8_t buf[512];
+    std::uint8_t buf[CACHE_THRESH];
     const std::uint32_t bytes = param->dst_bits >> 3;
     auto fp_copy = param->fp_copy;
-    const std::uint32_t limit = (bytes == 2) ? 256 : 170;
+    const std::uint32_t limit = CACHE_THRESH / bytes;
     std::uint8_t len = length % limit;
     if (len) {
       fp_copy(buf, 0, len, param);
@@ -419,76 +412,51 @@ namespace lgfx
     } while (length -= limit);
   }
 
+//*
   void Bus_Parallel8::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
   {
-    auto conf_start = _conf_reg_start;
-    const std::uint32_t data_wr = dc ? 0x01000100 : 0;
+    std::uint32_t dc_data = dc << 8;
+    auto idx = _cache_index;
+    auto c = _cache_flip;
 
-    if (length & 1) {
-      writeData(data[0], 8);
-      if (!--length) return;
-      ++data;
-    }
+    std::size_t limit = std::min(CACHE_THRESH, length + idx);
+    length -= limit - idx;
+    --data;
 
-    if (sendmode != sendmode_t::sendmode_16bit_nodma)
+    for (;;)
     {
-      sendmode = sendmode_t::sendmode_16bit_nodma;
-      while (!(*_i2s_state_reg & I2S_TX_IDLE));
-      *_i2s_sample_rate_conf_reg = _sample_rate_conf_reg_16bit;
-      *_i2s_fifo_conf_reg = _fifo_conf_default;
+      // --length;
+      c[idx^1] = *++data | dc_data;
+      if (++idx < limit) continue;
+      if (idx >= CACHE_THRESH)
+      {
+        idx = _flush(idx);
+        c = _cache_flip;
+      }
+      if (!length) break;
+      limit = std::min(CACHE_THRESH, length + idx);
+      length -= limit - idx;
     }
-
-    auto conf_reg_stop = _conf_reg_default | I2S_TX_RESET | I2S_RX_RESET | I2S_RX_FIFO_RESET;
-
-    auto i2s_fifo_wr_reg = _i2s_fifo_wr_reg;
-    auto i2s_conf_reg = _i2s_conf_reg;
+    _cache_index = idx;
+  }
+/*/
+  void Bus_Parallel8::writeBytes(const std::uint8_t* data, std::uint32_t length, bool dc, bool use_dma)
+  {
+    std::uint32_t dc_data = dc << 8;
+    auto idx = _cache_index;
+    auto c = _cache_flip;
     do
     {
-      std::int32_t limit = (((length>>1)-1)&(31))+1;
-      length -= limit << 1;
-      while (!(*_i2s_state_reg & I2S_TX_IDLE));
-      *i2s_conf_reg = conf_reg_stop;
-      do {
-        *i2s_fifo_wr_reg = data[0] << 16 | data[1] | data_wr;
-        data += 2;
-      } while (--limit);
-      *i2s_conf_reg = conf_start;
-    /// WiFi,BT使用時はI2SのDMAを使用すると誤動作するため、DMA不使用での処理を継続する。
-    } while (length && (*reg(DPORT_WIFI_CLK_EN_REG) & 0x7FF));
-    if (!length) return;
-
-// ここからDMA使用ルーチン
-
-    sendmode = sendmode_t::sendmode_16bit_dma;
-    std::uint32_t lbase = 64;
-    auto i2s_out_link_reg = reg(I2S_OUT_LINK_REG(_cfg.i2s_port));
-    do {
-      auto buf = (std::uint32_t*)_flip_buffer.getBuffer(512);
-      std::uint32_t limit = ((length - 1) & (lbase - 1)) + 1;
-      length -= limit;
-      _dmadesc->buf = (std::uint8_t*)buf;
-      std::uint32_t i = 0;
-      limit>>=1;
-      do {
-        buf[i] = data[0]<<16 | data[1] | data_wr;
-        data += 2;
-      } while (++i != limit);
-      *(std::uint32_t*)_dmadesc = (((i<<2) + 3) &  ~3 ) | i << 14 | 0xC0000000;
-
-      while (!(*_i2s_state_reg & I2S_TX_IDLE));
-      *i2s_out_link_reg = I2S_OUTLINK_START | ((uint32_t)_dmadesc & I2S_OUTLINK_ADDR);
-      *_i2s_conf_reg = conf_reg_stop;
-      *_i2s_fifo_conf_reg = _fifo_conf_dma;
-
-      // DMAの準備が完了するまでnopループで時間稼ぎ
-      i = 11;
-      do { __asm__ __volatile__ ("nop"); } while (--i);
-
-      *_i2s_conf_reg = conf_start;
-      if (lbase != 256) lbase <<= 1;
-    } while (length);
+      c[idx^1] = *data++ | dc_data;
+      if (++idx >= CACHE_THRESH)
+      {
+        idx = _flush(idx);
+        c = _cache_flip;
+      }
+    } while (--length);
+    _cache_index = idx;
   }
-
+//*/
   std::uint_fast8_t Bus_Parallel8::_reg_to_value(std::uint32_t raw_value)
   {
     return ((raw_value >> _cfg.pin_d7) & 1) << 7
@@ -503,16 +471,18 @@ namespace lgfx
 
   void Bus_Parallel8::beginRead(void)
   {
-      wait();
-      gpio_lo(_cfg.pin_rd);
+    if (_cache_index) { _cache_index = _flush(_cache_index, true); }
+
+    _wait();
+    gpio_lo(_cfg.pin_rd);
 //      gpio_pad_select_gpio(_gpio_rd);
 //      gpio_set_direction(_gpio_rd, GPIO_MODE_OUTPUT);
-      gpio_pad_select_gpio(_cfg.pin_wr);
-      gpio_hi(_cfg.pin_wr);
-      gpio_set_direction((gpio_num_t)_cfg.pin_wr, GPIO_MODE_OUTPUT);
-      gpio_pad_select_gpio(_cfg.pin_rs);
-      gpio_hi(_cfg.pin_rs);
-      gpio_set_direction((gpio_num_t)_cfg.pin_rs, GPIO_MODE_OUTPUT);
+    gpio_pad_select_gpio(_cfg.pin_wr);
+    gpio_hi(_cfg.pin_wr);
+    gpio_set_direction((gpio_num_t)_cfg.pin_wr, GPIO_MODE_OUTPUT);
+    gpio_pad_select_gpio(_cfg.pin_rs);
+    gpio_hi(_cfg.pin_rs);
+    gpio_set_direction((gpio_num_t)_cfg.pin_rs, GPIO_MODE_OUTPUT);
 //      if (_i2s_port == I2S_NUM_0) {
 ////        gpio_matrix_out(_gpio_rd, I2S0O_WS_OUT_IDX    ,1,0);
 //        gpio_matrix_out(_gpio_rd, I2S0O_BCK_OUT_IDX    ,1,0);
@@ -532,39 +502,39 @@ namespace lgfx
 //      gpio_matrix_in(_gpio_d0, idx_base    , 0); // LSB
 //*/
 /*
-      gpio_pad_select_gpio(_gpio_d7); gpio_set_direction(_gpio_d7, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d6); gpio_set_direction(_gpio_d6, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d5); gpio_set_direction(_gpio_d5, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d4); gpio_set_direction(_gpio_d4, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d3); gpio_set_direction(_gpio_d3, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d2); gpio_set_direction(_gpio_d2, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d1); gpio_set_direction(_gpio_d1, GPIO_MODE_INPUT);
-      gpio_pad_select_gpio(_gpio_d0); gpio_set_direction(_gpio_d0, GPIO_MODE_INPUT);
-      set_clock_read();
+    gpio_pad_select_gpio(_gpio_d7); gpio_set_direction(_gpio_d7, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d6); gpio_set_direction(_gpio_d6, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d5); gpio_set_direction(_gpio_d5, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d4); gpio_set_direction(_gpio_d4, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d3); gpio_set_direction(_gpio_d3, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d2); gpio_set_direction(_gpio_d2, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d1); gpio_set_direction(_gpio_d1, GPIO_MODE_INPUT);
+    gpio_pad_select_gpio(_gpio_d0); gpio_set_direction(_gpio_d0, GPIO_MODE_INPUT);
+    set_clock_read();
 /*/
-      gpio_matrix_out(_cfg.pin_d7, 0x100, 0, 0); // MSB
-      gpio_matrix_out(_cfg.pin_d6, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d5, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d4, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d3, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d2, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d1, 0x100, 0, 0);
-      gpio_matrix_out(_cfg.pin_d0, 0x100, 0, 0); // LSB
+    gpio_matrix_out(_cfg.pin_d7, 0x100, 0, 0); // MSB
+    gpio_matrix_out(_cfg.pin_d6, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d5, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d4, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d3, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d2, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d1, 0x100, 0, 0);
+    gpio_matrix_out(_cfg.pin_d0, 0x100, 0, 0); // LSB
 
-      lgfx::pinMode(_cfg.pin_d7, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d6, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d5, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d4, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d3, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d2, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d1, pin_mode_t::input);
-      lgfx::pinMode(_cfg.pin_d0, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d7, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d6, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d5, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d4, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d3, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d2, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d1, pin_mode_t::input);
+    lgfx::pinMode(_cfg.pin_d0, pin_mode_t::input);
 //*/
   }
 
   void Bus_Parallel8::endRead(void)
   {
-    wait();
+    _wait();
     _init_pin();
   }
 

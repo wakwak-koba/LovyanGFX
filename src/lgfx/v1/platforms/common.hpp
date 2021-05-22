@@ -41,6 +41,44 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
+  class SimpleBuffer
+  {
+  public:
+    virtual ~SimpleBuffer(void)
+    {
+      deleteBuffer();
+    }
+
+    void deleteBuffer(void)
+    {
+      _length = 0;
+      if (_buffer)
+      {
+        heap_free(_buffer);
+        _buffer = nullptr;
+      }
+    }
+
+    std::uint8_t* getBuffer(std::size_t length)
+    {
+      length = (length + 3) & ~3;
+
+      if (_length != length)
+      {
+        if (_buffer) heap_free(_buffer);
+        _buffer = (std::uint8_t*)heap_alloc_dma(length);
+        _length = _buffer ? length : 0;
+      }
+      return _buffer;
+    }
+
+  private:
+    std::uint8_t* _buffer = nullptr;
+    std::size_t _length = 0;
+  };
+
+//----------------------------------------------------------------------------
+
   class FlipBuffer
   {
   public:
@@ -51,7 +89,7 @@ namespace lgfx
 
     void deleteBuffer(void)
     {
-      for (int i = 0; i < 2; i++)
+      for (std::size_t i = 0; i < 2; i++)
       {
         _length[i] = 0;
         if (_buffer[i])
@@ -62,7 +100,7 @@ namespace lgfx
       }
     }
 
-    std::uint8_t* getBuffer(std::uint32_t length)
+    std::uint8_t* getBuffer(std::size_t length)
     {
       length = (length + 3) & ~3;
       _flip = !_flip;
@@ -78,7 +116,7 @@ namespace lgfx
 
   private:
     std::uint8_t* _buffer[2] = { nullptr, nullptr };
-    std::uint32_t _length[2] = { 0, 0 };
+    std::size_t _length[2] = { 0, 0 };
     bool _flip = false;
   };
 

@@ -221,7 +221,7 @@ namespace lgfx
     LGFX_INLINE_T void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
 
     LGFX_INLINE_T
-    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, lgfx::color_depth_t colordepth = lgfx::rgb332_1Byte)
+    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, color_depth_t colordepth = rgb332_1Byte)
     {
       auto pc = create_pc_fast(data, palette, colordepth);
       _panel->writePixels(&pc, len);

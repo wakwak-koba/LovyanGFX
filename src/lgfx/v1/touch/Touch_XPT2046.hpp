@@ -27,11 +27,11 @@ namespace lgfx
 
   struct Touch_XPT2046 : public ITouch
   {
-    int threshold = 512;
+    int threshold = 1280;
 
     Touch_XPT2046(void)
     {
-      _cfg.freq = 2500000;
+      _cfg.freq = 2700000;
       _cfg.x_min = 300;
       _cfg.x_max = 3900;
       _cfg.y_min = 400;

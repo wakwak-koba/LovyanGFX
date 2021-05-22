@@ -21,6 +21,7 @@ Contributors:
 #include <memory>
 
 #include "misc/enum.hpp"
+#include "misc/colortype.hpp"
 
 namespace lgfx
 {
@@ -33,24 +34,28 @@ namespace lgfx
   struct IPanel
   {
   protected:
-    std::uint32_t _start_count = 0;
+    std::uint32_t _start_count = 0; /// startWrite時に加算、endWrite時に減算(ただしマイナスにはならない)
+    color_conv_t _write_conv;
+    color_conv_t _read_conv;
+
+    color_depth_t _write_depth = color_depth_t::rgb565_2Byte;
+    color_depth_t _read_depth  = color_depth_t::rgb565_2Byte;
+    std::uint8_t _write_bits = 16;
+    std::uint8_t _read_bits = 16;
+
     std::uint16_t _xs = ~0;
     std::uint16_t _xe = ~0;
     std::uint16_t _ys = ~0;
     std::uint16_t _ye = ~0;
     std::uint16_t _width = 0;
     std::uint16_t _height = 0;
-    color_depth_t _write_depth = color_depth_t::rgb565_2Byte;
-    color_depth_t _read_depth  = color_depth_t::rgb565_2Byte;
-    std::uint8_t _write_bits = 16;
-    std::uint8_t _read_bits = 16;
     std::uint8_t _rotation = 0;
     epd_mode_t _epd_mode = (epd_mode_t)0;  // EPDでない場合は0。それ以外の場合はEPD描画モード
     bool _invert = false;
     bool _auto_display = false;
 
   public:
-    constexpr IPanel(void) = default;
+    // constexpr IPanel(void) = default;
     virtual ~IPanel(void) = default;
 
     void startWrite(bool transaction = true) { if (1 == ++_start_count && transaction) { beginTransaction(); } }
@@ -110,7 +115,7 @@ namespace lgfx
 
   struct Panel_NULL : public IPanel
   {
-    constexpr Panel_NULL(void) = default;
+    // constexpr Panel_NULL(void) = default;
 
     void beginTransaction(void) override {}
     void endTransaction(void) override {}

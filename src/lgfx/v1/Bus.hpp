@@ -73,6 +73,9 @@ namespace lgfx
     /// 繰返し実行した場合は前回と異なるポインタを得るが、前々回と同じになる場合がある点に注意すること。
     virtual std::uint8_t* getDMABuffer(std::uint32_t length) = 0;
 
+    /// 未送信のデータがあれば送信を開始する。
+    virtual void flush(void) = 0;
+
     /// D/Cピンをlowにしてデータを送信する。
     virtual bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) = 0;
 
@@ -110,6 +113,7 @@ namespace lgfx
     void execDMAQueue(void) override {}
     std::uint8_t* getDMABuffer(std::uint32_t length) override { return nullptr; }
 
+    void flush(void) override {}
     bool writeCommand(std::uint32_t data, std::uint_fast8_t bit_length) override { return false; }
     void writeData(std::uint32_t data, std::uint_fast8_t bit_length) override {}
     void writeDataRepeat(std::uint32_t data, std::uint_fast8_t bit_length, std::uint32_t count) override {}

@@ -428,16 +428,16 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
 
   namespace i2c // TODO: implement.
   {
-    bool init(int sercom_index, int pin_sda, int pin_scl)
+    cpp::result<void, error_t> init(int sercom_index, int pin_sda, int pin_scl)
     {
-      if ((std::size_t)sercom_index >= samd51::sercom_max) return false;
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
 
       int pad_sda = getPadNumber(sercom_index, pin_sda);
       int pad_scl = getPadNumber(sercom_index, pin_scl);
 
 // Serial.printf("sercom:%d scl:%d  sda:%d \r\n", sercom_index, pin_scl, pin_sda);
 // Serial.printf("pad scl:%d / pad sda:%d \r\n", pad_scl, pad_sda);
-      if (pad_sda != 0 || pad_scl != 1) return false;
+      if (pad_sda != 0 || pad_scl != 1) { return cpp::fail(error_t::invalid_arg); }
 
       auto sercom = reinterpret_cast<Sercom*>(samd51::getSercomData(sercom_index)->sercomPtr);
 
@@ -448,18 +448,31 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
       pinAssignSercom(pin_scl);
       pinAssignSercom(pin_sda);
 
-      return true;
+      return {};
     }
 
-    void release(int sercom_index)
+    cpp::result<void, error_t> release(int sercom_index)
     {
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
       auto sercom = reinterpret_cast<Sercom*>(samd51::getSercomData(sercom_index)->sercomPtr);
       sercom->I2CM.CTRLA.bit.ENABLE = 0;
       while ( sercom->I2CM.SYNCBUSY.bit.ENABLE != 0 );
+
+      return {};
     }
 
-    void beginTransaction(int sercom_index, int i2c_addr, std::uint32_t freq, bool read)
+    cpp::result<void, error_t> restart(int sercom_index, int i2c_addr, std::uint32_t freq, bool read)
     {
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
+      return {};
+    }
+
+    cpp::result<void, error_t> beginTransaction(int sercom_index, int i2c_addr, std::uint32_t freq, bool read)
+    {
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
       auto sercomData = samd51::getSercomData(sercom_index);
       auto sercom = reinterpret_cast<Sercom*>(sercomData->sercomPtr);
 
@@ -514,46 +527,87 @@ auto mastermode = SERCOM_SPI_CTRLA_MODE_SPI_MASTER;
 
       // Send start and address
       sercom->I2CM.ADDR.bit.ADDR = i2c_addr << 1 | read;
+
+      return {};
     }
 
-    bool endTransaction(int i2c_port) { return false; }
-    bool writeBytes(int i2c_port, const std::uint8_t *data, std::size_t length) { return false; }
-    bool readBytes(int i2c_port, std::uint8_t *data, std::size_t length) { return false; }
-
-    bool writeReadBytes(int i2c_port, std::uint16_t addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen, int freq)
+    cpp::result<void, error_t> endTransaction(int sercom_index)
     {
-      beginTransaction(i2c_port, addr, freq, false);
-      if (writeBytes(i2c_port, writedata, writelen)
-       && endTransaction(i2c_port))
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
+      return {};
+    }
+
+    cpp::result<void, error_t> writeBytes(int sercom_index, const std::uint8_t *data, std::size_t length)
+    {
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
+      return {};
+    }
+
+    cpp::result<void, error_t> readBytes(int sercom_index, std::uint8_t *data, std::size_t length)
+    {
+      if ((std::size_t)sercom_index >= samd51::sercom_max) { return cpp::fail(error_t::invalid_arg); }
+
+      return {};
+    }
+
+
+    cpp::result<void, error_t> transactionWrite(int sercom_index, int addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint32_t freq)
+    {
+      cpp::result<void, error_t> res;
+      if ((res = beginTransaction(sercom_index, addr, freq, false)).has_value()
+       && (res = writeBytes(sercom_index, writedata, writelen)).has_value()
+      )
       {
-        beginTransaction(i2c_port, addr, freq, true);
-        if (readBytes(i2c_port, readdata, readlen)
-         && endTransaction(i2c_port))
-        {
-          return true;
-        }
+        res = endTransaction(sercom_index);
       }
-      endTransaction(i2c_port);
-      return false;
+      return res;
     }
 
-    bool readRegister(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t *data, std::size_t length, int freq)
+    cpp::result<void, error_t> transactionRead(int sercom_index, int addr, std::uint8_t *readdata, std::uint8_t readlen, std::uint32_t freq)
     {
-      return writeReadBytes(i2c_port, addr, &reg, 1, data, length, freq);
+      cpp::result<void, error_t> res;
+      if ((res = beginTransaction(sercom_index, addr, freq, true)).has_value()
+       && (res = readBytes(sercom_index, readdata, readlen)).has_value()
+      )
+      {
+        res = endTransaction(sercom_index);
+      }
+      return res;
     }
 
-    bool writeRegister8(int i2c_port, std::uint16_t addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask, int freq)
+    cpp::result<void, error_t> transactionWriteRead(int sercom_index, int addr, const std::uint8_t *writedata, std::uint8_t writelen, std::uint8_t *readdata, std::size_t readlen, std::uint32_t freq)
+    {
+      cpp::result<void, error_t> res;
+      if ((res = beginTransaction(sercom_index, addr, freq, false)).has_value()
+       && (res = writeBytes(sercom_index, writedata, writelen)).has_value()
+       && (res = restart(sercom_index, addr, freq, true)).has_value()
+       && (res = readBytes(sercom_index, readdata, readlen)).has_value()
+      )
+      {
+        res = endTransaction(sercom_index);
+      }
+      return res;
+    }
+
+    cpp::result<std::uint8_t, error_t> registerRead8(int sercom_index, int addr, std::uint8_t reg, std::uint32_t freq)
+    {
+      auto res = transactionWriteRead(sercom_index, addr, &reg, 1, &reg, 1, freq);
+      if (res.has_value()) { return reg; }
+      return cpp::fail( res.error() );
+    }
+
+    cpp::result<void, error_t> registerWrite8(int sercom_index, int addr, std::uint8_t reg, std::uint8_t data, std::uint8_t mask, std::uint32_t freq)
     {
       std::uint8_t tmp[2] = { reg, data };
       if (mask)
       {
-        if (!writeReadBytes(i2c_port, addr, &reg, 1, &tmp[1], 1, freq)) return false;
+        auto res = transactionWriteRead(sercom_index, addr, &reg, 1, &tmp[1], 1, freq);
+        if (res.has_error()) { return res; }
         tmp[1] = (tmp[1] & mask) | data;
       }
-      beginTransaction(i2c_port, addr, freq, false);
-      bool res = writeBytes(i2c_port, tmp, 2);
-      endTransaction(i2c_port);
-      return res;
+      return transactionWrite(sercom_index, addr, tmp, 2, freq);
     }
   }
 

@@ -89,7 +89,7 @@ namespace lgfx
       --_buff_free_count;
       return false;
     }
-    limit = std::min(254u, limit * 2);
+    limit = std::min(255u, limit * 2);
 
     std::size_t retry = 16;
     _buff_free_count = 255;
@@ -120,59 +120,7 @@ namespace lgfx
 
     return false;
   }
-/*/
-  bool Panel_M5UnitLCD::_check_repeat(std::uint32_t cmd)
-  {
-    switch (_last_cmd & ~3)
-    {
-    default:
-      _last_cmd = cmd;
-      _check_busy();
-      return false;
 
-    case CMD_WR_RAW:
-    case CMD_WR_RLE:
-      if (_last_cmd == cmd) return true;
-      _last_cmd = cmd;
-      _bus->endTransaction();
-      cs_control(true);
-      _bus->beginTransaction();
-      cs_control(false);
-      return false;
-    }
-  }
-
-  void Panel_M5UnitLCD::_check_busy(void)
-  {
-    if (_buff_free_count > 128)
-    {
-      --_buff_free_count;
-    }
-    else
-    {
-      std::uint32_t retry = 16;
-      _bus->writeCommand(CMD_READ_BUFCOUNT, 8);
-      _bus->endTransaction();
-      do
-      {
-        _buff_free_count = 0;
-        _bus->beginRead();
-        _bus->readBytes(&_buff_free_count, 1);
-        _bus->endRead();
-Serial.printf("buf_free:%d\r\n", _buff_free_count);
-        if (_buff_free_count > 192) break;
-        _bus->beginTransaction();
-        _bus->writeCommand(CMD_READ_BUFCOUNT, 8);
-        _bus->endTransaction();
-lgfx::delay(1);
-      } while (--retry);
-//if (_buff_free_count == 0) _buff_free_count = 1;
-//if (retry != 16)
-//Serial.printf("---\r\n");
-      _bus->beginTransaction();
-    }
-  }
-//*/
   color_depth_t Panel_M5UnitLCD::setColorDepth(color_depth_t depth)
   {
     auto bits = (depth & color_depth_t::bit_mask);
@@ -342,26 +290,7 @@ lgfx::delay(1);
     _ypos = ys;
     _ys = ys;
     _ye = ye;
-/*
-    auto r = _internal_rotation;
-    if (r)
-    {
-      if (r & 1) { std::swap(xs, ys); std::swap(xe, ye); }
-      if ((1 + r - (r >> 2)) & 2)  // case 1:2:6:7:
-      {
-        std::swap(xs, xe);
-        xs = _cfg.panel_width - 1 - xs;
-        xe = _cfg.panel_width - 1 - xe;
-      }
 
-      if ((r - (r >> 2)) & 2) // case 2:3:4:7:
-      {
-        std::swap(ys, ye);
-        ys = _cfg.panel_height - 1 - ys;
-        ye = _cfg.panel_height - 1 - ye;
-      }
-    }
-*/
     startWrite();
     _set_window(xs, ys, xe, ye);
     endWrite();

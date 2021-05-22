@@ -41,18 +41,12 @@ namespace lgfx
 
   bool Touch_GT911::writeBytes(const std::uint8_t* data, std::size_t len)
   {
-    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq, false);
-    return lgfx::i2c::writeBytes(_cfg.i2c_port, data, len)
-        && lgfx::i2c::endTransaction(_cfg.i2c_port);
+    return lgfx::i2c::transactionWrite(_cfg.i2c_port, _cfg.i2c_addr, data, len, _cfg.freq).has_value();
   }
 
   bool Touch_GT911::writeReadBytes(const std::uint8_t* write_data, std::size_t write_len, std::uint8_t* read_data, std::size_t read_len)
   {
-    if (!writeBytes(write_data, write_len)) return false;
-
-    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq, true);
-    return lgfx::i2c::readBytes(_cfg.i2c_port, read_data, read_len)
-        && lgfx::i2c::endTransaction(_cfg.i2c_port);
+    return lgfx::i2c::transactionWriteRead(_cfg.i2c_port, _cfg.i2c_addr, write_data, write_len, read_data, read_len, _cfg.freq).has_value();
   }
 
   bool Touch_GT911::init(void)
@@ -128,7 +122,7 @@ namespace lgfx
     std::uint_fast8_t res = 0;
 
     std::uint32_t nowtime = millis();
-    if ((_cfg.pin_int < 0 || !gpio_in(_cfg.pin_int)) && (std::uint32_t)(nowtime - _lasttime) > _refresh_rate)
+    if ((_cfg.pin_int < 0 || !gpio_in(_cfg.pin_int)) && (std::uint32_t)(nowtime - _lasttime) >= _refresh_rate)
     {
       std::uint8_t buf;
       writeReadBytes(gt911cmd_getdata, 2, &buf, 1);

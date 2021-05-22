@@ -17,10 +17,10 @@ Contributors:
 /----------------------------------------------------------------------------*/
 #if defined (ESP32) || defined (CONFIG_IDF_TARGET_ESP32) || defined (CONFIG_IDF_TARGET_ESP32S2) || defined (ESP_PLATFORM)
 
-#include <soc/i2c_struct.h>
-
 #include "Bus_I2C.hpp"
 #include "../../misc/pixelcopy.hpp"
+
+#include <soc/i2c_struct.h>
 
 namespace lgfx
 {
@@ -70,9 +70,12 @@ namespace lgfx
     
     if (_state != state_t::state_none)
     {
-      lgfx::i2c::endTransaction(_cfg.i2c_port);
+      lgfx::i2c::restart(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq_read, true);
     }
-    lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq_read, true);
+    else
+    {
+      lgfx::i2c::beginTransaction(_cfg.i2c_port, _cfg.i2c_addr, _cfg.freq_read, true);
+    }
     _state = state_t::state_read;
   }
 
@@ -140,7 +143,7 @@ namespace lgfx
   bool Bus_I2C::writeCommand(std::uint32_t data, std::uint_fast8_t bit_length)
   {
     dc_control(false);
-    return lgfx::i2c::writeBytes(_cfg.i2c_port, (std::uint8_t*)&data, (bit_length >> 3));
+    return lgfx::i2c::writeBytes(_cfg.i2c_port, (std::uint8_t*)&data, (bit_length >> 3)).has_value();
   }
 
   void Bus_I2C::writeData(std::uint32_t data, std::uint_fast8_t bit_length)
@@ -214,7 +217,7 @@ namespace lgfx
   bool Bus_I2C::readBytes(std::uint8_t* dst, std::uint32_t length, bool use_dma)
   {
     beginRead();
-    return i2c::readBytes(_cfg.i2c_port, dst, length);
+    return i2c::readBytes(_cfg.i2c_port, dst, length).has_value();
   }
 
   void Bus_I2C::readPixels(void* dst, pixelcopy_t* param, std::uint32_t length)
