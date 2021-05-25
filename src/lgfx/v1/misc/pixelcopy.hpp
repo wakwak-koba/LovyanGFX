@@ -29,6 +29,9 @@ namespace lgfx
 
   struct pixelcopy_t
   {
+    static constexpr std::uint32_t FP_SCALE = 16;
+    static constexpr std::uint32_t NON_TRANSP = 1 << 24;
+
     union {
       std::uint32_t positions[4] = {0};
       struct {
@@ -54,7 +57,7 @@ namespace lgfx
     std::uint32_t src_bitwidth = 0;
     std::uint32_t src_width = 0;
     std::uint32_t src_height = 0;
-    std::uint32_t transp   = 1 << 24u; // A1 R0 G0 B0
+    std::uint32_t transp   = NON_TRANSP;
     std::uint32_t src_bits = 8;
     std::uint32_t dst_bits = 8;
     const void* src_data = nullptr;
@@ -65,8 +68,6 @@ namespace lgfx
     std::uint8_t dst_mask  = ~0;
     bool no_convert = false;
 
-    static constexpr std::uint32_t FP_SCALE = 16;
-
     pixelcopy_t(void) = default;
 
     pixelcopy_t( const void* src_data
@@ -74,7 +75,7 @@ namespace lgfx
                , color_depth_t src_depth
                , bool dst_palette = false
                , const void* src_palette = nullptr
-               , std::uint32_t src_transp = 1 << 24u
+               , std::uint32_t src_transp = NON_TRANSP
                )
     : transp    ( src_transp )
 /*

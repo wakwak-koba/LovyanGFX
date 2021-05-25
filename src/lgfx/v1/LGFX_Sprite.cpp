@@ -372,7 +372,7 @@ namespace lgfx
   void Panel_Sprite::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool)
   {
     std::uint_fast8_t r = _rotation;
-    if (r == 0 && param->transp == ~0u && param->no_convert && _img.use_memcpy())
+    if (r == 0 && param->transp == pixelcopy_t::NON_TRANSP && param->no_convert && _img.use_memcpy())
     {
       auto sx = param->src_x;
       auto bits = param->src_bits;

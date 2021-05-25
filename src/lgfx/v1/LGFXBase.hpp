@@ -221,7 +221,7 @@ namespace lgfx
     LGFX_INLINE_T void drawXBitmap(std::int32_t x, std::int32_t y, const std::uint8_t *bitmap, std::int32_t w, std::int32_t h, const T& fgcolor, const T& bgcolor) { draw_xbitmap(x, y, bitmap, w, h, _write_conv.convert(fgcolor), _write_conv.convert(bgcolor)); }
 
     LGFX_INLINE_T
-    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, color_depth_t colordepth = rgb332_1Byte)
+    void writeIndexedPixels(const std::uint8_t *data, T* palette, std::int32_t len, lgfx::color_depth_t colordepth = lgfx::rgb332_1Byte)
     {
       auto pc = create_pc_fast(data, palette, colordepth);
       _panel->writePixels(&pc, len);
@@ -953,13 +953,13 @@ namespace lgfx
            : create_pc_tr(reinterpret_cast<const bgr888_t*>(data), transparent);
     }
 
-    pixelcopy_t create_pc_palette(const void *data, const bgr888_t *palette, lgfx::color_depth_t depth, std::uint32_t transparent = ~0u)
+    pixelcopy_t create_pc_palette(const void *data, const bgr888_t *palette, lgfx::color_depth_t depth, std::uint32_t transparent = pixelcopy_t::NON_TRANSP)
     {
       return pixelcopy_t (data, _write_conv.depth, depth, hasPalette(), palette, transparent);
     }
 
     template<typename T>
-    pixelcopy_t create_pc_palette(const void *data, const T *palette, lgfx::color_depth_t depth, std::uint32_t transparent = ~0u)
+    pixelcopy_t create_pc_palette(const void *data, const T *palette, lgfx::color_depth_t depth, std::uint32_t transparent = pixelcopy_t::NON_TRANSP)
     {
       pixelcopy_t pc(data, getColorDepth(), depth, hasPalette(), palette, transparent);
       if (!hasPalette() && palette && _write_conv.bits >= 8)
@@ -970,17 +970,17 @@ namespace lgfx
     }
 
 
-    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint8_t *data, std::uint32_t raw_transparent = ~0u)
+    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint8_t *data, std::uint32_t raw_transparent = pixelcopy_t::NON_TRANSP)
     {
       return create_pc_antialias(reinterpret_cast<const rgb332_t*>(data), raw_transparent);
     }
-    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint16_t *data, std::uint32_t raw_transparent = ~0u)
+    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const std::uint16_t *data, std::uint32_t raw_transparent = pixelcopy_t::NON_TRANSP)
     {
       return _swapBytes
            ? create_pc_antialias(reinterpret_cast<const rgb565_t* >(data), raw_transparent)
            : create_pc_antialias(reinterpret_cast<const swap565_t*>(data), raw_transparent);
     }
-    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const void *data, std::uint32_t raw_transparent = ~0u)
+    __attribute__ ((always_inline)) inline pixelcopy_t create_pc_antialias(const void *data, std::uint32_t raw_transparent = pixelcopy_t::NON_TRANSP)
     {
       return _swapBytes
            ? create_pc_antialias(reinterpret_cast<const rgb888_t*>(data), raw_transparent)
@@ -988,7 +988,7 @@ namespace lgfx
     }
 
     template<typename T>
-    pixelcopy_t create_pc_antialias(const T* data, std::uint32_t raw_transparent = ~0u)
+    pixelcopy_t create_pc_antialias(const T* data, std::uint32_t raw_transparent = pixelcopy_t::NON_TRANSP)
     {
       pixelcopy_t pc(data, argb8888_t::depth, get_depth<T>::value, false, nullptr, raw_transparent);
       pc.src_data = data;
@@ -1006,7 +1006,7 @@ namespace lgfx
     }
 
     template<typename T>
-    static pixelcopy_t create_pc_antialias(const void* data, const T* palette, lgfx::color_depth_t depth, std::uint32_t transparent = ~0u)
+    static pixelcopy_t create_pc_antialias(const void* data, const T* palette, lgfx::color_depth_t depth, std::uint32_t transparent = pixelcopy_t::NON_TRANSP)
     {
       pixelcopy_t pc(data, argb8888_t::depth, depth, false, palette, transparent);
       if (palette)

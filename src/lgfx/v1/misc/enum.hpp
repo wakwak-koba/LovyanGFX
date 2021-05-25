@@ -206,31 +206,28 @@ namespace lgfx
 
   enum color_depth_t : std::uint16_t
   {
-    bit_mask            = 0x00FF   ,
-    has_palette         = 0x0100   ,
-    grayscale           = 0x0200   ,
-    alphachannel        = 0x0400   ,
-    alternate           = 0x0800   ,
-    non_swapped         = 0x1000   ,
+    bit_mask     = 0x00FF   , /// ビット数取得用マスク値 (下位1Byteはビット数表現専用とする。変更しないこと)
+    has_palette  = 0x0800   , /// パレット値として扱う
+    nonswapped   = 0x0100   , /// バイトスワップしていない値
+    alternate    = 0x1000   , /// ビット数が同一な色表現が複数ある場合の相違表現用
 
-    grayscale_1bit      =   1 | grayscale               , //                            _______L
-    grayscale_2bit      =   2 | grayscale               , //                            ______LL
-    grayscale_4bit      =   4 | grayscale               , //                            ____LLLL
-    grayscale_1Byte     =   8 | grayscale               , // ________ ________ ________ LLLLLLLL
-    palette_1bit        =   1 | has_palette             , //                            _______I   2 color
-    palette_2bit        =   2 | has_palette             , //                            ______II   4 color
-    palette_4bit        =   4 | has_palette             , //                            ____IIII  16 color
-    palette_8bit        =   8 | has_palette             , //                            IIIIIIII 256 color
-    rgb332_1Byte        =   8                           , // ________ ________ ________ RRRGGGBB
-    rgb565_2Byte        =  16                           , // ________ ________ GGGBBBBB RRRRRGGG
-    rgb666_3Byte        =  24 |               alternate , // ________ __BBBBBB __GGGGGG __RRRRRR
-    rgb888_3Byte        =  24                           , // ________ BBBBBBBB GGGGGGGG RRRRRRRR
-    argb8888_4Byte      =  32                           , // BBBBBBBB GGGGGGGG RRRRRRRR AAAAAAAA
-    rgb565_nonswapped   =  16 | non_swapped             , // ________ ________ RRRRRGGG GGGBBBBB
-    rgb666_nonswapped   =  24 | non_swapped | alternate , // ________ __RRRRRR __GGGGGG __BBBBBB
-    rgb888_nonswapped   =  24 | non_swapped             , // ________ RRRRRRRR GGGGGGGG BBBBBBBB
-    argb8888_nonswapped =  32 | non_swapped             , // AAAAAAAA RRRRRRRR GGGGGGGG BBBBBBBB
-//*/
+    grayscale_1bit      =   1                         , //                            _______L
+    grayscale_2bit      =   2                         , //                            ______LL
+    grayscale_4bit      =   4                         , //                            ____LLLL
+    grayscale_8bit      =   8 |              alternate, // ________ ________ ________ LLLLLLLL
+    palette_1bit        =   1 | has_palette           , //                            _______I   2 color
+    palette_2bit        =   2 | has_palette           , //                            ______II   4 color
+    palette_4bit        =   4 | has_palette           , //                            ____IIII  16 color
+    palette_8bit        =   8 | has_palette           , //                            IIIIIIII 256 color
+    rgb332_1Byte        =   8                         , // ________ ________ ________ RRRGGGBB
+    rgb565_2Byte        =  16                         , // ________ ________ GGGBBBBB RRRRRGGG
+    rgb666_3Byte        =  24 |              alternate, // ________ __BBBBBB __GGGGGG __RRRRRR
+    rgb888_3Byte        =  24                         , // ________ BBBBBBBB GGGGGGGG RRRRRRRR
+    argb8888_4Byte      =  32                         , // BBBBBBBB GGGGGGGG RRRRRRRR AAAAAAAA
+    rgb565_nonswapped   =  16 | nonswapped            , // ________ ________ RRRRRGGG GGGBBBBB
+    rgb666_nonswapped   =  24 | nonswapped | alternate, // ________ __RRRRRR __GGGGGG __BBBBBB
+    rgb888_nonswapped   =  24 | nonswapped            , // ________ RRRRRRRR GGGGGGGG BBBBBBBB
+    argb8888_nonswapped =  32 | nonswapped            , // AAAAAAAA RRRRRRRR GGGGGGGG BBBBBBBB
   };
 
 //----------------------------------------------------------------------------
@@ -247,9 +244,9 @@ namespace lgfx
  }
 }
 
-using namespace lgfx::v1::jpeg_div;
-using namespace lgfx::v1::colors;
-using namespace lgfx::v1::textdatum;
-using namespace lgfx::v1::datum;
-using namespace lgfx::v1::attribute;
-using namespace lgfx::v1::epd_mode;
+using namespace lgfx::jpeg_div;
+using namespace lgfx::colors;
+using namespace lgfx::textdatum;
+using namespace lgfx::datum;
+using namespace lgfx::attribute;
+using namespace lgfx::epd_mode;

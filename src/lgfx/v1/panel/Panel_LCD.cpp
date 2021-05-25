@@ -262,7 +262,7 @@ namespace lgfx
     auto bytes = param->dst_bits >> 3;
     auto src_x = param->src_x;
 
-    if (param->transp == ~0u)
+    if (param->transp == pixelcopy_t::NON_TRANSP)
     {
       if (param->no_convert)
       {

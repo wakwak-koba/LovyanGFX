@@ -478,7 +478,7 @@ if (bytelen != rleDecode(dest, res, bytes)*bytes) {
     std::uint32_t sx32 = param->src_x32;
     auto bytes = _write_bits >> 3;
     std::uint32_t y_add = 1;
-    bool transp = (param->transp != ~0u);
+    bool transp = (param->transp != pixelcopy_t::NON_TRANSP);
     if (!transp) { _set_window(x, y, x+w-1, y+h-1); }
     std::uint32_t wb = w * bytes;
     do
@@ -510,7 +510,7 @@ if (bytelen != rleDecode(dest, res, bytes)*bytes) {
     auto bytes = _write_bits >> 3;
     std::uint32_t y_add = 1;
     std::uint32_t cmd = CMD_WR_RLE | ((_write_bits >> 3) & 3);
-    bool transp = (param->transp != ~0u);
+    bool transp = (param->transp != pixelcopy_t::NON_TRANSP);
     if (!transp)
     {
       _set_window(x, y, x+w-1, y+h-1);

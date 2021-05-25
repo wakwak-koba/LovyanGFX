@@ -500,7 +500,7 @@ IT8951 Registers defines
     bool fast = _epd_mode == epd_mode_t::epd_fast || _epd_mode == epd_mode_t::epd_fastest;
     auto sx = param->src_x32;
 
-    bool fastdraw = (param->transp == ~0u);
+    bool fastdraw = (param->transp == pixelcopy_t::NON_TRANSP);
     if (fastdraw)
     {
       _set_area(x, y, w, h);
