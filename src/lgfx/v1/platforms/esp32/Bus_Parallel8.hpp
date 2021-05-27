@@ -116,7 +116,7 @@ namespace lgfx
 
     std::uint32_t _last_freq_apb;
     std::uint32_t _clkdiv_write;
-    i2s_dev_t *_dev;
+    volatile void *_dev;
     lldesc_t _dmadesc;
 
     volatile std::uint32_t* _i2s_fifo_wr_reg;

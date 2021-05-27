@@ -58,23 +58,24 @@ namespace lgfx
   {
     _init_pin();
 
+    auto i2s_dev = (i2s_dev_t*)_dev;
     //Reset I2S subsystem
-    _dev->conf.val = I2S_TX_RESET | I2S_RX_RESET | I2S_TX_FIFO_RESET | I2S_RX_FIFO_RESET;
-    _dev->conf.val = _conf_reg_default;
+    i2s_dev->conf.val = I2S_TX_RESET | I2S_RX_RESET | I2S_TX_FIFO_RESET | I2S_RX_FIFO_RESET;
+    i2s_dev->conf.val = _conf_reg_default;
 
-    _dev->int_ena.val = 0;
-    _dev->timing.val = 0;
+    i2s_dev->int_ena.val = 0;
+    i2s_dev->timing.val = 0;
 
     //Reset DMA
-    _dev->lc_conf.val = I2S_IN_RST | I2S_OUT_RST | I2S_AHBM_RST | I2S_AHBM_FIFO_RST;
-    _dev->lc_conf.val = I2S_OUT_EOF_MODE;
+    i2s_dev->lc_conf.val = I2S_IN_RST | I2S_OUT_RST | I2S_AHBM_RST | I2S_AHBM_FIFO_RST;
+    i2s_dev->lc_conf.val = I2S_OUT_EOF_MODE;
 
-    _dev->in_link.val = 0;
-    _dev->out_link.val = 0;
+    i2s_dev->in_link.val = 0;
+    i2s_dev->out_link.val = 0;
 
-    _dev->conf1.val = I2S_TX_PCM_BYPASS | I2S_TX_STOP_EN;
-    _dev->conf2.val = I2S_LCD_EN;
-    _dev->conf_chan.val = 1 << I2S_TX_CHAN_MOD_S | 1 << I2S_RX_CHAN_MOD_S;
+    i2s_dev->conf1.val = I2S_TX_PCM_BYPASS | I2S_TX_STOP_EN;
+    i2s_dev->conf2.val = I2S_LCD_EN;
+    i2s_dev->conf_chan.val = 1 << I2S_TX_CHAN_MOD_S | 1 << I2S_RX_CHAN_MOD_S;
 
     memset(&_dmadesc, 0, sizeof(lldesc_t));
   }
@@ -153,8 +154,9 @@ namespace lgfx
     }
     *reg(I2S_CLKM_CONF_REG(_cfg.i2s_port)) = _clkdiv_write;
 
-    _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
-    _dev->fifo_conf.val = _fifo_conf_default;
+    auto i2s_dev = (i2s_dev_t*)_dev;
+    i2s_dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+    i2s_dev->fifo_conf.val = _fifo_conf_default;
 
     _cache_index = 0;
     _cache_flip = _cache[0];
@@ -171,11 +173,12 @@ namespace lgfx
 
   void Bus_Parallel8::_wait(void)
   {
-    //_dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+    //i2s_dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+    auto i2s_dev = (i2s_dev_t*)_dev;
     auto conf_reg = _conf_reg_default | I2S_TX_RESET;
-    while (!_dev->state.tx_idle)
+    while (!i2s_dev->state.tx_idle)
     {}
-    _dev->conf.val = conf_reg;
+    i2s_dev->conf.val = conf_reg;
   }
 
   void Bus_Parallel8::wait(void)
@@ -185,7 +188,8 @@ namespace lgfx
 
   bool Bus_Parallel8::busy(void) const
   {
-    return !_dev->int_raw.tx_rempty || !_dev->state.tx_idle;
+    auto i2s_dev = (i2s_dev_t*)_dev;
+    return !i2s_dev->int_raw.tx_rempty || !i2s_dev->state.tx_idle;
   }
 
   void Bus_Parallel8::flush(void)
@@ -208,28 +212,29 @@ namespace lgfx
     bool slow = _div_num > 8;
 
     std::size_t idx_e = count & ~1;
+    auto i2s_dev = (i2s_dev_t*)_dev;
 
     if (idx_e)
     {
       _dmadesc.buf = (std::uint8_t*)_cache_flip;
       *(std::uint32_t*)&_dmadesc = idx_e << 1 | idx_e << 13 | 0xC0000000;
-      while (!_dev->state.tx_idle)
+      while (!i2s_dev->state.tx_idle)
       {}
-      _dev->fifo_conf.val = _fifo_conf_dma;
-      _dev->conf.val = _conf_reg_reset | I2S_TX_FIFO_RESET;
-      _dev->out_link.val = I2S_OUTLINK_START | ((uint32_t)&_dmadesc & I2S_OUTLINK_ADDR);
-      _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+      i2s_dev->fifo_conf.val = _fifo_conf_dma;
+      i2s_dev->conf.val = _conf_reg_reset | I2S_TX_FIFO_RESET;
+      i2s_dev->out_link.val = I2S_OUTLINK_START | ((uint32_t)&_dmadesc & I2S_OUTLINK_ADDR);
+      i2s_dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
 
       auto cache_old = _cache_flip;
       _cache_flip = (cache_old == _cache[0]) ? _cache[1] : _cache[0];
-      while (!_dev->state.tx_fifo_reset_back)
+      while (!i2s_dev->state.tx_fifo_reset_back)
       {}
 
       // DMAの準備待ちウェイト …無線使用中はウェイトを増やす
       std::size_t wait = (16 << checkWireless()) + (_div_num >> 2);
       do { __asm__ __volatile__ ("nop"); } while (--wait);
-      _dev->conf.val = _conf_reg_start;
-      if (slow) while (_dev->state.tx_idle) {}
+      i2s_dev->conf.val = _conf_reg_start;
+      if (slow) while (i2s_dev->state.tx_idle) {}
       
       count -= idx_e;
       if (!count) return 0;
@@ -247,12 +252,12 @@ namespace lgfx
     // ここから DMAで送信しきれなかった端数ぶんの送信処理
 
 //ets_delay_us(2);
-    while (!_dev->state.tx_idle)
+    while (!i2s_dev->state.tx_idle)
     {}
-    _dev->fifo_conf.val = _fifo_conf_default;
-    _dev->conf.val = _conf_reg_reset;// | I2S_TX_FIFO_RESET;
-    _dev->out_link.val = 0;
-    _dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
+    i2s_dev->fifo_conf.val = _fifo_conf_default;
+    i2s_dev->conf.val = _conf_reg_reset;// | I2S_TX_FIFO_RESET;
+    i2s_dev->out_link.val = 0;
+    i2s_dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
     std::size_t idx = 0;
     do
     {
@@ -262,8 +267,8 @@ namespace lgfx
     std::size_t wait = (16 << checkWireless()) + (_div_num >> 2);
     do { __asm__ __volatile__ ("nop"); } while (--wait);
     if (slow) ets_delay_us(_div_num >> 6);
-    _dev->conf.val = _conf_reg_start;
-    if (slow) while (_dev->state.tx_idle) {}
+    i2s_dev->conf.val = _conf_reg_start;
+    if (slow) while (i2s_dev->state.tx_idle) {}
 //ets_delay_us(2);
 
     return 0;
@@ -273,9 +278,9 @@ namespace lgfx
   std::size_t Bus_Parallel8::_flush(std::size_t count, bool force)
   {
     bool slow = _div_num > 8;
-    while (!_dev->int_raw.tx_rempty || (slow && !_dev->state.tx_idle))
+    while (!i2s_dev->int_raw.tx_rempty || (slow && !i2s_dev->state.tx_idle))
     {}
-    _dev->conf.val = _conf_reg_reset;
+    i2s_dev->conf.val = _conf_reg_reset;
 
     std::size_t idx_e = std::min(CACHE_THRESH, count & ~3);
 
@@ -291,8 +296,8 @@ namespace lgfx
         *_i2s_fifo_wr_reg = c[(idx>>1)+1];
       } while ((idx += 4) != idx_e);
       if (slow) ets_delay_us(_div_num >> 6);
-      _dev->conf.val = _conf_reg_start;
-      _dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+      i2s_dev->conf.val = _conf_reg_start;
+      i2s_dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
 
       count -= idx_e;
 
@@ -310,20 +315,20 @@ namespace lgfx
     }
 
     std::size_t idx = 0;
-    while (!_dev->int_raw.tx_rempty || (slow && !_dev->state.tx_idle))
+    while (!i2s_dev->int_raw.tx_rempty || (slow && !i2s_dev->state.tx_idle))
     {}
-    _dev->conf.val = _conf_reg_reset;
+    i2s_dev->conf.val = _conf_reg_reset;
 
-    _dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
+    i2s_dev->sample_rate_conf.val = _sample_rate_conf_reg_32bit;
     do
     {
       *_i2s_fifo_wr_reg = cache[idx^1] << 16;
     } while (++idx != count);
 
     if (slow) ets_delay_us(_div_num >> 6);
-    _dev->conf.val = _conf_reg_start;
-    _dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
-    _dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
+    i2s_dev->conf.val = _conf_reg_start;
+    i2s_dev->int_clr.val = I2S_TX_REMPTY_INT_CLR;
+    i2s_dev->sample_rate_conf.val = _sample_rate_conf_reg_16bit;
 
     return 0;
   }

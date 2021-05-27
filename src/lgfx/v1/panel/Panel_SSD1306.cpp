@@ -75,14 +75,23 @@ namespace lgfx
     return _bus->busy();
   }
 
-  void Panel_1bitOLED::init(bool use_reset)
+  bool Panel_1bitOLED::init(bool use_reset)
   {
-    Panel_Device::init(use_reset);
+    _range_new.top = 0;
+    _range_new.left = 0;
+    _range_new.right = _width - 1;
+    _range_new.bottom = _height - 1;
 
     int len = ((_cfg.panel_height + 7) >> 3) * _cfg.panel_width;
     if (_buf) heap_free(_buf);
     _buf = static_cast<std::uint8_t*>(heap_alloc_dma(len));
     memset(_buf, 0, len);
+
+    if (!Panel_Device::init(use_reset))
+    {
+      return false;
+    }
+
     startWrite(true);
 
     for (std::size_t i = 0; auto cmds = getInitCommands(i); i++)
@@ -96,10 +105,7 @@ namespace lgfx
     setRotation(_rotation);
     endWrite();
 
-    _range_new.top = 0;
-    _range_new.left = 0;
-    _range_new.right = _width - 1;
-    _range_new.bottom = _height - 1;
+    return true;
   }
 
   void Panel_1bitOLED::setInvert(bool invert)
@@ -384,14 +390,27 @@ namespace lgfx
 
 //----------------------------------------------------------------------------
 
-  void Panel_SH110x::init(bool use_reset)
+  bool Panel_SH110x::init(bool use_reset)
   {
-    Panel_1bitOLED::init(use_reset);
+    if (!Panel_1bitOLED::init(use_reset))
+    {
+      return false;
+    }
 
-    startWrite(true);
-    _bus->writeCommand(CMD_SETMULTIPLEX | (((_cfg.panel_width-1) & 0x7F) << 8), 16);
-    _bus->writeCommand(CMD_SETDISPLAYOFFSET | ((uint8_t)(-_cfg.offset_x) << 8), 16);
-    endWrite();
+    _bus->beginRead();
+    std::uint8_t buf;
+    bool res = _bus->readBytes(&buf, 1, true);
+    _bus->endTransaction();
+
+    if (res)
+    {
+      startWrite(true);
+      _bus->writeCommand(CMD_SETMULTIPLEX | (((_cfg.panel_width-1) & 0x7F) << 8), 16);
+      _bus->writeCommand(CMD_SETDISPLAYOFFSET | ((uint8_t)(-_cfg.offset_x) << 8), 16);
+      endWrite();
+    }
+
+    return res;
   }
 
   void Panel_SH110x::beginTransaction(void)

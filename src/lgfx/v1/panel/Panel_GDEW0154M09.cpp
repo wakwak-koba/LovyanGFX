@@ -49,7 +49,7 @@ namespace lgfx
     return color_depth_t::rgb565_2Byte;
   }
 
-  void Panel_GDEW0154M09::init(bool use_reset)
+  bool Panel_GDEW0154M09::init(bool use_reset)
   {
     pinMode(_cfg.pin_busy, pin_mode_t::input);
 
@@ -82,6 +82,8 @@ namespace lgfx
     _range_new = _range_old;
 
     endWrite();
+
+    return true;
   }
 
   void Panel_GDEW0154M09::beginTransaction(void)

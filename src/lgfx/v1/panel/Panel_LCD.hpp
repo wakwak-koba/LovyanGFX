@@ -28,7 +28,7 @@ namespace lgfx
   class Panel_LCD : public Panel_Device
   {
   public:
-    void init(bool use_reset) override;
+    bool init(bool use_reset) override;
     void beginTransaction(void) override;
     void endTransaction(void) override;
 

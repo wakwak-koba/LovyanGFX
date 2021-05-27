@@ -850,8 +850,8 @@ namespace lgfx
       pc.palette   = palette;
       //pc.src_bits  = src_depth > 8 ? (src_depth + 7) & ~7 : src_depth;
       //pc.dst_bits  = dst_depth > 8 ? (dst_depth + 7) & ~7 : dst_depth;
-      pc.src_bits  = src_depth & color_depth_t::bit_mask;
-      pc.dst_bits  = dst_depth & color_depth_t::bit_mask;
+      pc.src_depth = src_depth;
+      pc.dst_depth = dst_depth;
       pc.src_mask  = (1 << pc.src_bits) - 1 ;
       pc.dst_mask  = (1 << pc.dst_bits) - 1 ;
       pc.no_convert= src_depth == dst_depth;
@@ -1102,10 +1102,11 @@ namespace lgfx
   public:
     LGFX_Device(void);
 
-    void init(void)               { init_impl(true , true); };
-    void begin(void)              { init_impl(true , true); };
-    void init_without_reset(void) { init_impl(false, false); };
+    bool init(void)               { return init_impl(true , true); };
+    bool begin(void)              { return init_impl(true , true); };
+    bool init_without_reset(void) { return init_impl(false, false); };
     void initBus(void);
+    void setPanel(Panel_Device* panel);
 
     void setEpdMode(epd_mode_t epd_mode) { _panel->setEpdMode(epd_mode); }
     epd_mode_t getEpdMode(void) const { return _panel->getEpdMode(); }
@@ -1120,8 +1121,7 @@ namespace lgfx
 
     inline Panel_Device* panel(void) const { return reinterpret_cast<Panel_Device*>(_panel); }
     inline Panel_Device* getPanel(void) const { return reinterpret_cast<Panel_Device*>(_panel); }
-    inline void panel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
-    inline void setPanel(Panel_Device* panel) { _panel = reinterpret_cast<IPanel*>(panel); }
+    inline void panel(Panel_Device* panel) { setPanel(panel); }
 
     inline void writeCommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // AdafruitGFX compatible
     inline void writecommand(  std::uint8_t  cmd) { _panel->writeCommand(                  cmd , 1); } // TFT_eSPI compatible
@@ -1211,7 +1211,7 @@ namespace lgfx
   protected:
     std::uint8_t _brightness = 127;
 
-    virtual void init_impl(bool use_reset, bool use_clear);
+    virtual bool init_impl(bool use_reset, bool use_clear);
 
     void draw_calibrate_point(std::int32_t x, std::int32_t y, std::int32_t r, std::uint32_t fg_rawcolor, std::uint32_t bg_rawcolor);
 

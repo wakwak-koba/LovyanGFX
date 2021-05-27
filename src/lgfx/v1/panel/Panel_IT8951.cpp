@@ -117,9 +117,17 @@ IT8951 Registers defines
     return color_depth_t::rgb888_3Byte;
   }
 
-  void Panel_IT8951::init(bool use_reset)
+  bool Panel_IT8951::init(bool use_reset)
   {
-    Panel_Device::init(use_reset);
+    _range_new.top = INT16_MAX;
+    _range_new.left = INT16_MAX;
+    _range_new.right = 0;
+    _range_new.bottom = 0;
+
+    if (!Panel_Device::init(use_reset))
+    {
+      return false;
+    }
     pinMode(_cfg.pin_busy, pin_mode_t::input);
 
     _wait_busy();
@@ -138,12 +146,9 @@ IT8951 Registers defines
 
     _set_target_memory_addr(_tar_memaddr);
 
-    _range_new.top = INT16_MAX;
-    _range_new.left = INT16_MAX;
-    _range_new.right = 0;
-    _range_new.bottom = 0;
-
     endWrite();
+
+    return true;
   }
 
   void Panel_IT8951::beginTransaction(void)

@@ -58,8 +58,24 @@ namespace lgfx
     std::uint32_t src_width = 0;
     std::uint32_t src_height = 0;
     std::uint32_t transp   = NON_TRANSP;
-    std::uint32_t src_bits = 8;
-    std::uint32_t dst_bits = 8;
+    union
+    {
+      color_depth_t src_depth = rgb332_1Byte;
+      struct
+      {
+        std::uint8_t src_bits;
+        std::uint8_t src_attrib;
+      };
+    };
+    union
+    {
+      color_depth_t dst_depth = rgb332_1Byte;
+      struct
+      {
+        std::uint8_t dst_bits;
+        std::uint8_t dst_attrib;
+      };
+    };
     const void* src_data = nullptr;
     const void* palette = nullptr;
     std::uint32_t (*fp_copy)(void*, std::uint32_t, std::uint32_t, pixelcopy_t*) = nullptr;
@@ -82,8 +98,8 @@ namespace lgfx
     , src_bits  ( src_depth > 8 ? (src_depth + 7) & ~7 : src_depth)
     , dst_bits  ( dst_depth > 8 ? (dst_depth + 7) & ~7 : dst_depth)
 */
-    , src_bits  ( src_depth & color_depth_t::bit_mask )
-    , dst_bits  ( dst_depth & color_depth_t::bit_mask )
+    , src_depth ( src_depth )
+    , dst_depth ( dst_depth )
     , src_data  ( src_data   )
     , palette   ( src_palette)
     , src_mask  ( (1 << src_bits) - 1 )

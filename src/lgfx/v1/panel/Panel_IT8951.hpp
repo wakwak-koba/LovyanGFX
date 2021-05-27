@@ -33,7 +33,7 @@ namespace lgfx
 
     void beginTransaction(void) override;
     void endTransaction(void) override;
-    void init(bool use_reset) override;
+    bool init(bool use_reset) override;
 
     color_depth_t setColorDepth(color_depth_t depth) override;
 

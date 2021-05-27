@@ -26,9 +26,12 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  void Panel_LCD::init(bool use_reset)
+  bool Panel_LCD::init(bool use_reset)
   {
-    Panel_Device::init(use_reset);
+    if (!Panel_Device::init(use_reset))
+    {
+      return false;
+    }
 
     startWrite(true);
 
@@ -38,6 +41,8 @@ namespace lgfx
     }
 
     endWrite();
+
+    return true;
   }
 
   void Panel_LCD::beginTransaction(void)

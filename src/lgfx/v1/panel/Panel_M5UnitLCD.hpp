@@ -34,7 +34,7 @@ namespace lgfx
       _cfg.memory_height = _cfg.panel_height = 240;
     }
 
-    void init(bool use_reset) override;
+    bool init(bool use_reset) override;
     void beginTransaction(void) override;
     void endTransaction(void) override;
 
@@ -80,44 +80,59 @@ namespace lgfx
     static constexpr std::uint8_t CMD_SET_POWER    = 0x38; // 2Byte data[1] 0:低速ローパワー / 1:通常 / 2:高速ハイパワー
     static constexpr std::uint8_t CMD_SET_SLEEP    = 0x39; // 2Byte data[1] 0:スリープ解除 / 1:スリープ開始
 
-    static constexpr std::uint8_t CMD_WR_RAW       = 0x40;
-    static constexpr std::uint8_t CMD_WR_RAW_8     = 0x41; // 不定長 RGB332のピクセルデータを連続送信
-    static constexpr std::uint8_t CMD_WR_RAW_16    = 0x42; // 不定長 RGB565のピクセルデータを連続送信
-    static constexpr std::uint8_t CMD_WR_RAW_24    = 0x43; // 不定長 RGB888のピクセルデータを連続送信
+    static constexpr std::uint8_t CMD_SET_RECT     = 0x3F; // 9Byte 矩形範囲指定 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE
 
-    static constexpr std::uint8_t CMD_WR_RLE       = 0x44;
-    static constexpr std::uint8_t CMD_WR_RLE_8     = 0x45; // 不定長 RGB332のRLE圧縮されたピクセルデータを連続送信
-    static constexpr std::uint8_t CMD_WR_RLE_16    = 0x46; // 不定長 RGB565のRLE圧縮されたピクセルデータを連続送信
-    static constexpr std::uint8_t CMD_WR_RLE_24    = 0x47; // 不定長 RGB888のRLE圧縮されたピクセルデータを連続送信
+    static constexpr std::uint8_t CMD_WR_RAW       = 0x40;
+    static constexpr std::uint8_t CMD_WR_RAW_8     = 0x41; // 不定長 RGB332   1Byteのピクセルデータを連続送信
+    static constexpr std::uint8_t CMD_WR_RAW_16    = 0x42; // 不定長 RGB565   2Byteのピクセルデータを連続送信
+    static constexpr std::uint8_t CMD_WR_RAW_24    = 0x43; // 不定長 RGB888   3Byteのピクセルデータを連続送信
+    static constexpr std::uint8_t CMD_WR_RAW_32    = 0x44; // 不定長 ARGB8888 4Byteのピクセルデータを連続送信
+
+    static constexpr std::uint8_t CMD_WR_RLE       = 0x48;
+    static constexpr std::uint8_t CMD_WR_RLE_8     = 0x49; // 不定長 RGB332   1Byteのピクセルデータを連続送信(RLE圧縮)
+    static constexpr std::uint8_t CMD_WR_RLE_16    = 0x4A; // 不定長 RGB565   2Byteのピクセルデータを連続送信(RLE圧縮)
+    static constexpr std::uint8_t CMD_WR_RLE_24    = 0x4B; // 不定長 RGB888   3Byteのピクセルデータを連続送信(RLE圧縮)
+    static constexpr std::uint8_t CMD_WR_RLE_32    = 0x4C; // 不定長 ARGB8888 4Byteのピクセルデータを連続送信(RLE圧縮)
 
     static constexpr std::uint8_t CMD_RAM_FILL     = 0x50; // 1Byte 現在の描画色で選択範囲全塗り
     static constexpr std::uint8_t CMD_SET_COLOR    = 0x50;
     static constexpr std::uint8_t CMD_SET_COLOR_8  = 0x51; // 2Byte 描画色をRGB332で指定
     static constexpr std::uint8_t CMD_SET_COLOR_16 = 0x52; // 3Byte 描画色をRGB565で指定
     static constexpr std::uint8_t CMD_SET_COLOR_24 = 0x53; // 4Byte 描画色をRGB888で指定
+    static constexpr std::uint8_t CMD_SET_COLOR_32 = 0x54; // 5Byte 描画色をARGB8888で指定
 
-    static constexpr std::uint8_t CMD_DRAWPIXEL    = 0x54; // 5Byte ドット描画 [1~2]==X [3~4]==Y
-    static constexpr std::uint8_t CMD_DRAWPIXEL_8  = 0x55; // 6Byte ドット描画 [1~2]==X [3~4]==Y [5  ]==RGB332
-    static constexpr std::uint8_t CMD_DRAWPIXEL_16 = 0x56; // 7Byte ドット描画 [1~2]==X [3~4]==Y [5~6]==RGB565
-    static constexpr std::uint8_t CMD_DRAWPIXEL_24 = 0x57; // 8Byte ドット描画 [1~2]==X [3~4]==Y [5~7]==RGB888
+    static constexpr std::uint8_t CMD_DRAWPIXEL    = 0x60; // 5Byte ドット描画 [1~2]==X [3~4]==Y
+    static constexpr std::uint8_t CMD_DRAWPIXEL_8  = 0x61; // 6Byte ドット描画 [1~2]==X [3~4]==Y [5  ]==RGB332
+    static constexpr std::uint8_t CMD_DRAWPIXEL_16 = 0x62; // 7Byte ドット描画 [1~2]==X [3~4]==Y [5~6]==RGB565
+    static constexpr std::uint8_t CMD_DRAWPIXEL_24 = 0x63; // 8Byte ドット描画 [1~2]==X [3~4]==Y [5~7]==RGB888
+    static constexpr std::uint8_t CMD_DRAWPIXEL_32 = 0x64; // 9Byte ドット描画 [1~2]==X [3~4]==Y [5~8]==ARGB8888
 
-    static constexpr std::uint8_t CMD_FILLRECT     = 0x58; //  9Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE
-    static constexpr std::uint8_t CMD_FILLRECT_8   = 0x59; // 10Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9   ]==RGB332
-    static constexpr std::uint8_t CMD_FILLRECT_16  = 0x5A; // 11Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~10]==RGB565
-    static constexpr std::uint8_t CMD_FILLRECT_24  = 0x5B; // 12Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~11]==RGB888
+    static constexpr std::uint8_t CMD_FILLRECT     = 0x68; //  9Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE
+    static constexpr std::uint8_t CMD_FILLRECT_8   = 0x69; // 10Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9   ]==RGB332
+    static constexpr std::uint8_t CMD_FILLRECT_16  = 0x6A; // 11Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~10]==RGB565
+    static constexpr std::uint8_t CMD_FILLRECT_24  = 0x6B; // 12Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~11]==RGB888
+    static constexpr std::uint8_t CMD_FILLRECT_32  = 0x6C; // 13Byte 矩形塗潰 [1~2]==XS [3~4]==YS [5~6]==XE [7~8]==YE [9~12]==ARGB8888
 
-    static constexpr std::uint8_t CMD_RD_RAW       = 0x60;
-    static constexpr std::uint8_t CMD_RD_RAW_8     = 0x61; // 1Byte RGB332のピクセルデータを読出し
-    static constexpr std::uint8_t CMD_RD_RAW_16    = 0x62; // 1Byte RGB565のピクセルデータを読出し
-    static constexpr std::uint8_t CMD_RD_RAW_24    = 0x63; // 1Byte RGB888のピクセルデータを読出し
+    static constexpr std::uint8_t CMD_RD_RAW       = 0x80;
+    static constexpr std::uint8_t CMD_RD_RAW_8     = 0x81; // 1Byte RGB332のピクセルデータを読出し
+    static constexpr std::uint8_t CMD_RD_RAW_16    = 0x82; // 1Byte RGB565のピクセルデータを読出し
+    static constexpr std::uint8_t CMD_RD_RAW_24    = 0x83; // 1Byte RGB888のピクセルデータを読出し
 
     static constexpr std::uint8_t CMD_CHANGE_ADDR  = 0xA0; // 4Byte i2cアドレス変更 [1]=I2Cアドレス [2]=I2Cアドレスビット反転値 [3]=0xA0
 
-    static constexpr std::uint8_t CMD_RESET        = 0xFF; // 4Byte リセット [1]=0x77 [2]=0x89 [3]=0x00
+    static constexpr std::uint8_t CMD_UPDATE_BEGIN = 0xF0; // 4Byte ファームウェア更新開始   [1]=0x77 [2]=0x89 [3]=0xF0
+    static constexpr std::uint8_t CMD_UPDATE_DATA  = 0xF1; // 4Byte ファームウェアデータ送信 [1]=0x77 [2]=0x89 [3]=0xF1
+    static constexpr std::uint8_t CMD_UPDATE_END   = 0xF2; // 4Byte ファームウェア更新完了   [1]=0x77 [2]=0x89 [3]=0xF2
+    static constexpr std::uint8_t CMD_RESET        = 0xFF; // 4Byte リセット [1]=0x77 [2]=0x89 [3]=0xFF
 
 //    static constexpr std::uint8_t CMD_SET_COLOR    = 0x3F; // 3byte 描画色設定 data[1~2]==RGB565色データ
 //    static constexpr std::uint8_t CMD_RAMWR      = 0x40; // 不定長 ピクセルデータ送信
 //    static constexpr std::uint8_t CMD_RAM_RLE    = 0x41; // 不定長 RLEピクセルデータ送信
+
+    static constexpr std::uint8_t UPDATE_RESULT_BROKEN = 0x01;
+    static constexpr std::uint8_t UPDATE_RESULT_ERROR  = 0x00;
+    static constexpr std::uint8_t UPDATE_RESULT_OK     = 0xF1;
+    static constexpr std::uint8_t UPDATE_RESULT_BUSY   = 0xFF;
 
   protected:
   

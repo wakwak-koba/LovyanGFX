@@ -80,14 +80,14 @@ namespace lgfx
       _rotation = 1;
     }
 
-    void init(bool use_reset) override
+    bool init(bool use_reset) override
     {
       lgfx::gpio_hi(_cfg.pin_rst);
       lgfx::pinMode(_cfg.pin_rst, lgfx::pin_mode_t::input_pulldown);
       _cfg.invert = lgfx::gpio_in(_cfg.pin_rst);       // get panel type (IPS or TN)
       lgfx::pinMode(_cfg.pin_rst, lgfx::pin_mode_t::output);
 
-      lgfx::Panel_ILI9342::init(use_reset);
+      return lgfx::Panel_ILI9342::init(use_reset);
     }
   };
 
@@ -272,7 +272,7 @@ namespace lgfx
       _set_backlight(bl);
     }
 
-    void init_impl(bool use_reset, bool use_clear)
+    bool init_impl(bool use_reset, bool use_clear)
     {
       static constexpr char NVS_KEY[] = "AUTODETECT";
       std::uint32_t nvs_board = 0;
@@ -354,7 +354,7 @@ namespace lgfx
 
       /// autodetectの際にreset済みなのでここではuse_resetをfalseで呼び出す。
       /// M5Paperはreset後の復帰に 800msec程度掛かるので reset省略は起動時間短縮に有効
-      LGFX_Device::init_impl(false, use_clear);
+      bool res = LGFX_Device::init_impl(false, use_clear);
 
       if (nvs_board != _board) {
         if (0 == nvs_open(LIBRARY_NAME, NVS_READWRITE, &nvs_handle)) {
@@ -363,6 +363,7 @@ namespace lgfx
           nvs_close(nvs_handle);
         }
       }
+      return res;
     }
 
   public:

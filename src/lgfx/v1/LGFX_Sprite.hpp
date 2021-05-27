@@ -32,10 +32,33 @@ namespace lgfx
 //----------------------------------------------------------------------------
   class LGFX_Sprite;
 
-  struct Panel_Sprite : public Panel_NULL
+  struct Panel_Sprite : public IPanel
   {
     friend LGFX_Sprite;
+
     Panel_Sprite(void) { _start_count = INT32_MAX; }
+
+    void beginTransaction(void) override {}
+    void endTransaction(void) override {}
+    bool init(bool use_reset) override { return true; }
+    void setInvert(bool invert) override {}
+    void setSleep(bool flg_sleep) override {}
+    void setPowerSave(bool flg_partial) override {}
+    void writeCommand(std::uint32_t cmd, std::uint_fast8_t length) override {}
+    void writeData(std::uint32_t data, std::uint_fast8_t length) override {}
+    void initDMA(void) override {}
+    void waitDMA(void) override {}
+    bool dmaBusy(void) override { return false; }
+    void waitDisplay(void) override {}
+    bool displayBusy(void) override { return false; }
+    void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override {}
+    bool isReadable(void) const override { return true; }
+    bool isBusShared(void) const override { return false; }
+
+    std::uint32_t readCommand(std::uint_fast8_t cmd, std::uint_fast8_t index = 0, std::uint_fast8_t length = 4) override { return 0; }
+    std::uint32_t readData(std::uint_fast8_t index = 0, std::uint_fast8_t length = 4) override { return 0; }
+
+
     void setBuffer(void* buffer, std::int32_t w, std::int32_t h, color_conv_t* conv);
     void deleteSprite(void);
     void* createSprite(std::int32_t w, std::int32_t h, color_conv_t* conv, bool psram);
@@ -48,7 +71,10 @@ namespace lgfx
     color_depth_t setColorDepth(color_depth_t depth) override;
     void setRotation(std::uint_fast8_t r) override;
 
-    bool isReadable(void) const override { return true; }
+
+    /// ToDo implement
+    void writePixels(pixelcopy_t* param, std::uint32_t len) override {}
+
 
     void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) override;
     void drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor) override;

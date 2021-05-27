@@ -113,7 +113,6 @@ namespace lgfx
   {
     LGFX(void) // コンストラクタ内で定義を行う
     {
-
       panel(&_panel_instance);      // 使用するパネルを指定する
     }
 

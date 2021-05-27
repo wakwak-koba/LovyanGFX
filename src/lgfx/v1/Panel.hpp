@@ -71,7 +71,7 @@ namespace lgfx
 
     virtual void beginTransaction(void) = 0;
     virtual void endTransaction(void) = 0;
-    virtual void init(bool use_reset) = 0;
+    virtual bool init(bool use_reset) = 0;
 
     virtual void setBrightness(std::uint8_t brightness) {};
 
@@ -107,47 +107,6 @@ namespace lgfx
     virtual void readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param) = 0;
     virtual void copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y) = 0;
  };
-
-  struct Panel_NULL : public IPanel
-  {
-    constexpr Panel_NULL(void) = default;
-
-    void beginTransaction(void) override {}
-    void endTransaction(void) override {}
-    void init(bool use_reset) override {}
-
-    color_depth_t setColorDepth(color_depth_t depth) override { return depth; }
-
-    void setInvert(bool invert) override {}
-    void setRotation(std::uint_fast8_t r) override {}
-    void setSleep(bool flg_sleep) override {}
-    void setPowerSave(bool flg_partial) override {}
-
-    void writeCommand(std::uint32_t cmd, std::uint_fast8_t length) override {}
-    void writeData(std::uint32_t data, std::uint_fast8_t length) override {}
-
-    void initDMA(void) override {}
-    void waitDMA(void) override {}
-    bool dmaBusy(void) override { return 0; }
-    void waitDisplay(void) override {}
-    bool displayBusy(void) override { return 0; }
-    void display(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h) override {}
-    bool isReadable(void) const override { return 0; }
-    bool isBusShared(void) const override { return 0; }
-
-    void writeBlock(std::uint32_t rawcolor, std::uint32_t len) override {}
-    void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) override {}
-    void drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor) override {}
-    void writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t rawcolor) override {}
-    void writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool use_dma) override {}
-    void writeImageARGB(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param) override {}
-    void writePixels(pixelcopy_t* param, std::uint32_t len) override {}
-
-    std::uint32_t readCommand(std::uint_fast8_t cmd, std::uint_fast8_t index = 0, std::uint_fast8_t length = 4) override { return 0; }
-    std::uint32_t readData(std::uint_fast8_t index = 0, std::uint_fast8_t length = 4) override { return 0; }
-    void readRect(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, void* dst, pixelcopy_t* param) override {}
-    void copyRect(std::uint_fast16_t dst_x, std::uint_fast16_t dst_y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint_fast16_t src_x, std::uint_fast16_t src_y) override {}
-  };
 
 //----------------------------------------------------------------------------
  }

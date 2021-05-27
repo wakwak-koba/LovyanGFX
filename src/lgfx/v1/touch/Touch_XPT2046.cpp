@@ -97,7 +97,7 @@ namespace lgfx
     tp->y = (yt[10]+yt[11]+yt[12]+yt[13]) >> 2;
 
     std::sort(size, size+21);
-    tp->size = std::max(0,
+    tp->size = std::max<std::uint16_t>(0,
                         0
                         + size[10]
                         + (tp->y * ((_cfg.x_max - tp->x) >> 4) >> 9) // 座標による感度の差を補正(LoLIN D32 Proで調整)

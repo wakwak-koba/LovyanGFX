@@ -26,14 +26,14 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  void Panel_M5UnitLCD::init(bool use_reset)
+  bool Panel_M5UnitLCD::init(bool use_reset)
   {
-    Panel_Device::init(false);
+    if (!Panel_Device::init(false)) return false;
 
     if (use_reset)
     {
       startWrite(true);
-      _bus->writeCommand(CMD_RESET | 0x77 << 8 | 0x89 << 16, 32);
+      _bus->writeCommand(CMD_RESET | 0x77 << 8 | 0x89 << 16 | CMD_RESET << 24, 32);
       endWrite();
       // リセットコマンド後は150msec待つ
       lgfx::delay(150);
@@ -41,11 +41,20 @@ namespace lgfx
 
     startWrite(true);
 
+    _bus->writeCommand(CMD_READ_ID, 8);
+    std::uint8_t buf[4];
+    bool res = _bus->readBytes(buf, 4, true)
+            && buf[0] == 0x77 && buf[1] == 0x89;
+
     _buff_free_count = 0;
-  
-    _check_repeat();
+    if (res)
+    {
+      _check_repeat();
+    }
 
     endWrite();
+
+    return res;
   }
 
   void Panel_M5UnitLCD::beginTransaction(void)

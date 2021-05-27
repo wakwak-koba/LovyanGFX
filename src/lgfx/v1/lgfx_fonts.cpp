@@ -1118,230 +1118,226 @@ namespace lgfx
   };
 
 //----------------------------------------------------------------------------
- }
-}
+  namespace fonts
+  {
+    using namespace lgfx;
 
-namespace fonts
-{
- inline namespace v1
- {
-  using namespace lgfx;
+    // Original Adafruit_GFX "Free Fonts"
+    #include "../Fonts/GFXFF/TomThumb.h"  // TT1
 
-  // Original Adafruit_GFX "Free Fonts"
-  #include "../Fonts/GFXFF/TomThumb.h"  // TT1
+    #include "../Fonts/GFXFF/FreeMono9pt7b.h"  // FF1 or FM9
+    #include "../Fonts/GFXFF/FreeMono12pt7b.h" // FF2 or FM12
+    #include "../Fonts/GFXFF/FreeMono18pt7b.h" // FF3 or FM18
+    #include "../Fonts/GFXFF/FreeMono24pt7b.h" // FF4 or FM24
 
-  #include "../Fonts/GFXFF/FreeMono9pt7b.h"  // FF1 or FM9
-  #include "../Fonts/GFXFF/FreeMono12pt7b.h" // FF2 or FM12
-  #include "../Fonts/GFXFF/FreeMono18pt7b.h" // FF3 or FM18
-  #include "../Fonts/GFXFF/FreeMono24pt7b.h" // FF4 or FM24
+    #include "../Fonts/GFXFF/FreeMonoOblique9pt7b.h"  // FF5 or FMO9
+    #include "../Fonts/GFXFF/FreeMonoOblique12pt7b.h" // FF6 or FMO12
+    #include "../Fonts/GFXFF/FreeMonoOblique18pt7b.h" // FF7 or FMO18
+    #include "../Fonts/GFXFF/FreeMonoOblique24pt7b.h" // FF8 or FMO24
 
-  #include "../Fonts/GFXFF/FreeMonoOblique9pt7b.h"  // FF5 or FMO9
-  #include "../Fonts/GFXFF/FreeMonoOblique12pt7b.h" // FF6 or FMO12
-  #include "../Fonts/GFXFF/FreeMonoOblique18pt7b.h" // FF7 or FMO18
-  #include "../Fonts/GFXFF/FreeMonoOblique24pt7b.h" // FF8 or FMO24
+    #include "../Fonts/GFXFF/FreeMonoBold9pt7b.h"  // FF9  or FMB9
+    #include "../Fonts/GFXFF/FreeMonoBold12pt7b.h" // FF10 or FMB12
+    #include "../Fonts/GFXFF/FreeMonoBold18pt7b.h" // FF11 or FMB18
+    #include "../Fonts/GFXFF/FreeMonoBold24pt7b.h" // FF12 or FMB24
 
-  #include "../Fonts/GFXFF/FreeMonoBold9pt7b.h"  // FF9  or FMB9
-  #include "../Fonts/GFXFF/FreeMonoBold12pt7b.h" // FF10 or FMB12
-  #include "../Fonts/GFXFF/FreeMonoBold18pt7b.h" // FF11 or FMB18
-  #include "../Fonts/GFXFF/FreeMonoBold24pt7b.h" // FF12 or FMB24
+    #include "../Fonts/GFXFF/FreeMonoBoldOblique9pt7b.h"  // FF13 or FMBO9
+    #include "../Fonts/GFXFF/FreeMonoBoldOblique12pt7b.h" // FF14 or FMBO12
+    #include "../Fonts/GFXFF/FreeMonoBoldOblique18pt7b.h" // FF15 or FMBO18
+    #include "../Fonts/GFXFF/FreeMonoBoldOblique24pt7b.h" // FF16 or FMBO24
 
-  #include "../Fonts/GFXFF/FreeMonoBoldOblique9pt7b.h"  // FF13 or FMBO9
-  #include "../Fonts/GFXFF/FreeMonoBoldOblique12pt7b.h" // FF14 or FMBO12
-  #include "../Fonts/GFXFF/FreeMonoBoldOblique18pt7b.h" // FF15 or FMBO18
-  #include "../Fonts/GFXFF/FreeMonoBoldOblique24pt7b.h" // FF16 or FMBO24
+    // Sans serif fonts
+    #include "../Fonts/GFXFF/FreeSans9pt7b.h"  // FF17 or FSS9
+    #include "../Fonts/GFXFF/FreeSans12pt7b.h" // FF18 or FSS12
+    #include "../Fonts/GFXFF/FreeSans18pt7b.h" // FF19 or FSS18
+    #include "../Fonts/GFXFF/FreeSans24pt7b.h" // FF20 or FSS24
 
-  // Sans serif fonts
-  #include "../Fonts/GFXFF/FreeSans9pt7b.h"  // FF17 or FSS9
-  #include "../Fonts/GFXFF/FreeSans12pt7b.h" // FF18 or FSS12
-  #include "../Fonts/GFXFF/FreeSans18pt7b.h" // FF19 or FSS18
-  #include "../Fonts/GFXFF/FreeSans24pt7b.h" // FF20 or FSS24
+    #include "../Fonts/GFXFF/FreeSansOblique9pt7b.h"  // FF21 or FSSO9
+    #include "../Fonts/GFXFF/FreeSansOblique12pt7b.h" // FF22 or FSSO12
+    #include "../Fonts/GFXFF/FreeSansOblique18pt7b.h" // FF23 or FSSO18
+    #include "../Fonts/GFXFF/FreeSansOblique24pt7b.h" // FF24 or FSSO24
 
-  #include "../Fonts/GFXFF/FreeSansOblique9pt7b.h"  // FF21 or FSSO9
-  #include "../Fonts/GFXFF/FreeSansOblique12pt7b.h" // FF22 or FSSO12
-  #include "../Fonts/GFXFF/FreeSansOblique18pt7b.h" // FF23 or FSSO18
-  #include "../Fonts/GFXFF/FreeSansOblique24pt7b.h" // FF24 or FSSO24
+    #include "../Fonts/GFXFF/FreeSansBold9pt7b.h"  // FF25 or FSSB9
+    #include "../Fonts/GFXFF/FreeSansBold12pt7b.h" // FF26 or FSSB12
+    #include "../Fonts/GFXFF/FreeSansBold18pt7b.h" // FF27 or FSSB18
+    #include "../Fonts/GFXFF/FreeSansBold24pt7b.h" // FF28 or FSSB24
 
-  #include "../Fonts/GFXFF/FreeSansBold9pt7b.h"  // FF25 or FSSB9
-  #include "../Fonts/GFXFF/FreeSansBold12pt7b.h" // FF26 or FSSB12
-  #include "../Fonts/GFXFF/FreeSansBold18pt7b.h" // FF27 or FSSB18
-  #include "../Fonts/GFXFF/FreeSansBold24pt7b.h" // FF28 or FSSB24
+    #include "../Fonts/GFXFF/FreeSansBoldOblique9pt7b.h"  // FF29 or FSSBO9
+    #include "../Fonts/GFXFF/FreeSansBoldOblique12pt7b.h" // FF30 or FSSBO12
+    #include "../Fonts/GFXFF/FreeSansBoldOblique18pt7b.h" // FF31 or FSSBO18
+    #include "../Fonts/GFXFF/FreeSansBoldOblique24pt7b.h" // FF32 or FSSBO24
 
-  #include "../Fonts/GFXFF/FreeSansBoldOblique9pt7b.h"  // FF29 or FSSBO9
-  #include "../Fonts/GFXFF/FreeSansBoldOblique12pt7b.h" // FF30 or FSSBO12
-  #include "../Fonts/GFXFF/FreeSansBoldOblique18pt7b.h" // FF31 or FSSBO18
-  #include "../Fonts/GFXFF/FreeSansBoldOblique24pt7b.h" // FF32 or FSSBO24
+    // Serif fonts
+    #include "../Fonts/GFXFF/FreeSerif9pt7b.h"  // FF33 or FS9
+    #include "../Fonts/GFXFF/FreeSerif12pt7b.h" // FF34 or FS12
+    #include "../Fonts/GFXFF/FreeSerif18pt7b.h" // FF35 or FS18
+    #include "../Fonts/GFXFF/FreeSerif24pt7b.h" // FF36 or FS24
 
-  // Serif fonts
-  #include "../Fonts/GFXFF/FreeSerif9pt7b.h"  // FF33 or FS9
-  #include "../Fonts/GFXFF/FreeSerif12pt7b.h" // FF34 or FS12
-  #include "../Fonts/GFXFF/FreeSerif18pt7b.h" // FF35 or FS18
-  #include "../Fonts/GFXFF/FreeSerif24pt7b.h" // FF36 or FS24
+    #include "../Fonts/GFXFF/FreeSerifItalic9pt7b.h"  // FF37 or FSI9
+    #include "../Fonts/GFXFF/FreeSerifItalic12pt7b.h" // FF38 or FSI12
+    #include "../Fonts/GFXFF/FreeSerifItalic18pt7b.h" // FF39 or FSI18
+    #include "../Fonts/GFXFF/FreeSerifItalic24pt7b.h" // FF40 or FSI24
 
-  #include "../Fonts/GFXFF/FreeSerifItalic9pt7b.h"  // FF37 or FSI9
-  #include "../Fonts/GFXFF/FreeSerifItalic12pt7b.h" // FF38 or FSI12
-  #include "../Fonts/GFXFF/FreeSerifItalic18pt7b.h" // FF39 or FSI18
-  #include "../Fonts/GFXFF/FreeSerifItalic24pt7b.h" // FF40 or FSI24
+    #include "../Fonts/GFXFF/FreeSerifBold9pt7b.h"  // FF41 or FSB9
+    #include "../Fonts/GFXFF/FreeSerifBold12pt7b.h" // FF42 or FSB12
+    #include "../Fonts/GFXFF/FreeSerifBold18pt7b.h" // FF43 or FSB18
+    #include "../Fonts/GFXFF/FreeSerifBold24pt7b.h" // FF44 or FSB24
 
-  #include "../Fonts/GFXFF/FreeSerifBold9pt7b.h"  // FF41 or FSB9
-  #include "../Fonts/GFXFF/FreeSerifBold12pt7b.h" // FF42 or FSB12
-  #include "../Fonts/GFXFF/FreeSerifBold18pt7b.h" // FF43 or FSB18
-  #include "../Fonts/GFXFF/FreeSerifBold24pt7b.h" // FF44 or FSB24
+    #include "../Fonts/GFXFF/FreeSerifBoldItalic9pt7b.h"  // FF45 or FSBI9
+    #include "../Fonts/GFXFF/FreeSerifBoldItalic12pt7b.h" // FF46 or FSBI12
+    #include "../Fonts/GFXFF/FreeSerifBoldItalic18pt7b.h" // FF47 or FSBI18
+    #include "../Fonts/GFXFF/FreeSerifBoldItalic24pt7b.h" // FF48 or FSBI24
 
-  #include "../Fonts/GFXFF/FreeSerifBoldItalic9pt7b.h"  // FF45 or FSBI9
-  #include "../Fonts/GFXFF/FreeSerifBoldItalic12pt7b.h" // FF46 or FSBI12
-  #include "../Fonts/GFXFF/FreeSerifBoldItalic18pt7b.h" // FF47 or FSBI18
-  #include "../Fonts/GFXFF/FreeSerifBoldItalic24pt7b.h" // FF48 or FSBI24
+    // Custom fonts
+    #include "../Fonts/Custom/Orbitron_Light_24.h"
+    #include "../Fonts/Custom/Orbitron_Light_32.h"
+    #include "../Fonts/Custom/Roboto_Thin_24.h"
+    #include "../Fonts/Custom/Satisfy_24.h"
+    #include "../Fonts/Custom/Yellowtail_32.h"
 
-  // Custom fonts
-  #include "../Fonts/Custom/Orbitron_Light_24.h"
-  #include "../Fonts/Custom/Orbitron_Light_32.h"
-  #include "../Fonts/Custom/Roboto_Thin_24.h"
-  #include "../Fonts/Custom/Satisfy_24.h"
-  #include "../Fonts/Custom/Yellowtail_32.h"
+    #include "../Fonts/glcdfont.h"
+    #include "../Fonts/Font16.h"
+    #include "../Fonts/Font32rle.h"
+    #include "../Fonts/Font64rle.h"
+    #include "../Fonts/Font7srle.h"
+    #include "../Fonts/Font72rle.h"
+    #include "../Fonts/Font8x8C64.h"
+    #include "../Fonts/Ascii24x48.h"
+    #include "../Fonts/Ascii8x16.h"
 
-  #include "../Fonts/glcdfont.h"
-  #include "../Fonts/Font16.h"
-  #include "../Fonts/Font32rle.h"
-  #include "../Fonts/Font64rle.h"
-  #include "../Fonts/Font7srle.h"
-  #include "../Fonts/Font72rle.h"
-  #include "../Fonts/Font8x8C64.h"
-  #include "../Fonts/Ascii24x48.h"
-  #include "../Fonts/Ascii8x16.h"
+    static constexpr std::uint8_t font0_info[]      = {  0, 255, 5  }; // start code, end code, width
+    static constexpr std::uint8_t font8x8c64_info[] = { 32, 143, 8 }; // start code, end code, width
 
-  static constexpr std::uint8_t font0_info[]      = {  0, 255, 5  }; // start code, end code, width
-  static constexpr std::uint8_t font8x8c64_info[] = { 32, 143, 8 }; // start code, end code, width
+    const GLCDfont Font0 = { font      , font0_info, 6, 8, 7 };
+    const BMPfont  Font2 = { chrtbl_f16, widtbl_f16, 0, chr_hgt_f16, baseline_f16 };
+    const RLEfont  Font4 = { chrtbl_f32, widtbl_f32, 0, chr_hgt_f32, baseline_f32 };
+    const RLEfont  Font6 = { chrtbl_f64, widtbl_f64, 0, chr_hgt_f64, baseline_f64 };
+    const RLEfont  Font7 = { chrtbl_f7s, widtbl_f7s, 0, chr_hgt_f7s, baseline_f7s };
+    const RLEfont  Font8 = { chrtbl_f72, widtbl_f72, 0, chr_hgt_f72, baseline_f72 };
+    const GLCDfont Font8x8C64 = { font8x8_c64, font8x8c64_info, 8, 8, 7 };
+    const FixedBMPfont AsciiFont8x16  = { FontLib8x16 , nullptr,  8, 16, 13 };
+    const FixedBMPfont AsciiFont24x48 = { FontLib24x48, nullptr, 24, 48, 40 };
 
-  const GLCDfont Font0 = { font      , font0_info, 6, 8, 7 };
-  const BMPfont  Font2 = { chrtbl_f16, widtbl_f16, 0, chr_hgt_f16, baseline_f16 };
-  const RLEfont  Font4 = { chrtbl_f32, widtbl_f32, 0, chr_hgt_f32, baseline_f32 };
-  const RLEfont  Font6 = { chrtbl_f64, widtbl_f64, 0, chr_hgt_f64, baseline_f64 };
-  const RLEfont  Font7 = { chrtbl_f7s, widtbl_f7s, 0, chr_hgt_f7s, baseline_f7s };
-  const RLEfont  Font8 = { chrtbl_f72, widtbl_f72, 0, chr_hgt_f72, baseline_f72 };
-  const GLCDfont Font8x8C64 = { font8x8_c64, font8x8c64_info, 8, 8, 7 };
-  const FixedBMPfont AsciiFont8x16  = { FontLib8x16 , nullptr,  8, 16, 13 };
-  const FixedBMPfont AsciiFont24x48 = { FontLib24x48, nullptr, 24, 48, 40 };
+    const U8g2font lgfxJapanMincho_8   = { lgfx_font_japan_mincho_8    };
+    const U8g2font lgfxJapanMincho_12  = { lgfx_font_japan_mincho_12   };
+    const U8g2font lgfxJapanMincho_16  = { lgfx_font_japan_mincho_16   };
+    const U8g2font lgfxJapanMincho_20  = { lgfx_font_japan_mincho_20   };
+    const U8g2font lgfxJapanMincho_24  = { lgfx_font_japan_mincho_24   };
+    const U8g2font lgfxJapanMincho_28  = { lgfx_font_japan_mincho_28   };
+    const U8g2font lgfxJapanMincho_32  = { lgfx_font_japan_mincho_32   };
+    const U8g2font lgfxJapanMincho_36  = { lgfx_font_japan_mincho_36   };
+    const U8g2font lgfxJapanMincho_40  = { lgfx_font_japan_mincho_40   };
+    const U8g2font lgfxJapanMinchoP_8  = { lgfx_font_japan_mincho_p_8  };
+    const U8g2font lgfxJapanMinchoP_12 = { lgfx_font_japan_mincho_p_12 };
+    const U8g2font lgfxJapanMinchoP_16 = { lgfx_font_japan_mincho_p_16 };
+    const U8g2font lgfxJapanMinchoP_20 = { lgfx_font_japan_mincho_p_20 };
+    const U8g2font lgfxJapanMinchoP_24 = { lgfx_font_japan_mincho_p_24 };
+    const U8g2font lgfxJapanMinchoP_28 = { lgfx_font_japan_mincho_p_28 };
+    const U8g2font lgfxJapanMinchoP_32 = { lgfx_font_japan_mincho_p_32 };
+    const U8g2font lgfxJapanMinchoP_36 = { lgfx_font_japan_mincho_p_36 };
+    const U8g2font lgfxJapanMinchoP_40 = { lgfx_font_japan_mincho_p_40 };
+    const U8g2font lgfxJapanGothic_8   = { lgfx_font_japan_gothic_8    };
+    const U8g2font lgfxJapanGothic_12  = { lgfx_font_japan_gothic_12   };
+    const U8g2font lgfxJapanGothic_16  = { lgfx_font_japan_gothic_16   };
+    const U8g2font lgfxJapanGothic_20  = { lgfx_font_japan_gothic_20   };
+    const U8g2font lgfxJapanGothic_24  = { lgfx_font_japan_gothic_24   };
+    const U8g2font lgfxJapanGothic_28  = { lgfx_font_japan_gothic_28   };
+    const U8g2font lgfxJapanGothic_32  = { lgfx_font_japan_gothic_32   };
+    const U8g2font lgfxJapanGothic_36  = { lgfx_font_japan_gothic_36   };
+    const U8g2font lgfxJapanGothic_40  = { lgfx_font_japan_gothic_40   };
+    const U8g2font lgfxJapanGothicP_8  = { lgfx_font_japan_gothic_p_8  };
+    const U8g2font lgfxJapanGothicP_12 = { lgfx_font_japan_gothic_p_12 };
+    const U8g2font lgfxJapanGothicP_16 = { lgfx_font_japan_gothic_p_16 };
+    const U8g2font lgfxJapanGothicP_20 = { lgfx_font_japan_gothic_p_20 };
+    const U8g2font lgfxJapanGothicP_24 = { lgfx_font_japan_gothic_p_24 };
+    const U8g2font lgfxJapanGothicP_28 = { lgfx_font_japan_gothic_p_28 };
+    const U8g2font lgfxJapanGothicP_32 = { lgfx_font_japan_gothic_p_32 };
+    const U8g2font lgfxJapanGothicP_36 = { lgfx_font_japan_gothic_p_36 };
+    const U8g2font lgfxJapanGothicP_40 = { lgfx_font_japan_gothic_p_40 };
 
-  const U8g2font lgfxJapanMincho_8   = { lgfx_font_japan_mincho_8    };
-  const U8g2font lgfxJapanMincho_12  = { lgfx_font_japan_mincho_12   };
-  const U8g2font lgfxJapanMincho_16  = { lgfx_font_japan_mincho_16   };
-  const U8g2font lgfxJapanMincho_20  = { lgfx_font_japan_mincho_20   };
-  const U8g2font lgfxJapanMincho_24  = { lgfx_font_japan_mincho_24   };
-  const U8g2font lgfxJapanMincho_28  = { lgfx_font_japan_mincho_28   };
-  const U8g2font lgfxJapanMincho_32  = { lgfx_font_japan_mincho_32   };
-  const U8g2font lgfxJapanMincho_36  = { lgfx_font_japan_mincho_36   };
-  const U8g2font lgfxJapanMincho_40  = { lgfx_font_japan_mincho_40   };
-  const U8g2font lgfxJapanMinchoP_8  = { lgfx_font_japan_mincho_p_8  };
-  const U8g2font lgfxJapanMinchoP_12 = { lgfx_font_japan_mincho_p_12 };
-  const U8g2font lgfxJapanMinchoP_16 = { lgfx_font_japan_mincho_p_16 };
-  const U8g2font lgfxJapanMinchoP_20 = { lgfx_font_japan_mincho_p_20 };
-  const U8g2font lgfxJapanMinchoP_24 = { lgfx_font_japan_mincho_p_24 };
-  const U8g2font lgfxJapanMinchoP_28 = { lgfx_font_japan_mincho_p_28 };
-  const U8g2font lgfxJapanMinchoP_32 = { lgfx_font_japan_mincho_p_32 };
-  const U8g2font lgfxJapanMinchoP_36 = { lgfx_font_japan_mincho_p_36 };
-  const U8g2font lgfxJapanMinchoP_40 = { lgfx_font_japan_mincho_p_40 };
-  const U8g2font lgfxJapanGothic_8   = { lgfx_font_japan_gothic_8    };
-  const U8g2font lgfxJapanGothic_12  = { lgfx_font_japan_gothic_12   };
-  const U8g2font lgfxJapanGothic_16  = { lgfx_font_japan_gothic_16   };
-  const U8g2font lgfxJapanGothic_20  = { lgfx_font_japan_gothic_20   };
-  const U8g2font lgfxJapanGothic_24  = { lgfx_font_japan_gothic_24   };
-  const U8g2font lgfxJapanGothic_28  = { lgfx_font_japan_gothic_28   };
-  const U8g2font lgfxJapanGothic_32  = { lgfx_font_japan_gothic_32   };
-  const U8g2font lgfxJapanGothic_36  = { lgfx_font_japan_gothic_36   };
-  const U8g2font lgfxJapanGothic_40  = { lgfx_font_japan_gothic_40   };
-  const U8g2font lgfxJapanGothicP_8  = { lgfx_font_japan_gothic_p_8  };
-  const U8g2font lgfxJapanGothicP_12 = { lgfx_font_japan_gothic_p_12 };
-  const U8g2font lgfxJapanGothicP_16 = { lgfx_font_japan_gothic_p_16 };
-  const U8g2font lgfxJapanGothicP_20 = { lgfx_font_japan_gothic_p_20 };
-  const U8g2font lgfxJapanGothicP_24 = { lgfx_font_japan_gothic_p_24 };
-  const U8g2font lgfxJapanGothicP_28 = { lgfx_font_japan_gothic_p_28 };
-  const U8g2font lgfxJapanGothicP_32 = { lgfx_font_japan_gothic_p_32 };
-  const U8g2font lgfxJapanGothicP_36 = { lgfx_font_japan_gothic_p_36 };
-  const U8g2font lgfxJapanGothicP_40 = { lgfx_font_japan_gothic_p_40 };
+    const U8g2font efontCN_10     = { lgfx_efont_cn_10    };
+    const U8g2font efontCN_10_b   = { lgfx_efont_cn_10_b  };
+    const U8g2font efontCN_10_bi  = { lgfx_efont_cn_10_bi };
+    const U8g2font efontCN_10_i   = { lgfx_efont_cn_10_i  };
+    const U8g2font efontCN_12     = { lgfx_efont_cn_12    };
+    const U8g2font efontCN_12_b   = { lgfx_efont_cn_12_b  };
+    const U8g2font efontCN_12_bi  = { lgfx_efont_cn_12_bi };
+    const U8g2font efontCN_12_i   = { lgfx_efont_cn_12_i  };
+    const U8g2font efontCN_14     = { lgfx_efont_cn_14    };
+    const U8g2font efontCN_14_b   = { lgfx_efont_cn_14_b  };
+    const U8g2font efontCN_14_bi  = { lgfx_efont_cn_14_bi };
+    const U8g2font efontCN_14_i   = { lgfx_efont_cn_14_i  };
+    const U8g2font efontCN_16     = { lgfx_efont_cn_16    };
+    const U8g2font efontCN_16_b   = { lgfx_efont_cn_16_b  };
+    const U8g2font efontCN_16_bi  = { lgfx_efont_cn_16_bi };
+    const U8g2font efontCN_16_i   = { lgfx_efont_cn_16_i  };
+    const U8g2font efontCN_24     = { lgfx_efont_cn_24    };
+    const U8g2font efontCN_24_b   = { lgfx_efont_cn_24_b  };
+    const U8g2font efontCN_24_bi  = { lgfx_efont_cn_24_bi };
+    const U8g2font efontCN_24_i   = { lgfx_efont_cn_24_i  };
 
-  const U8g2font efontCN_10     = { lgfx_efont_cn_10    };
-  const U8g2font efontCN_10_b   = { lgfx_efont_cn_10_b  };
-  const U8g2font efontCN_10_bi  = { lgfx_efont_cn_10_bi };
-  const U8g2font efontCN_10_i   = { lgfx_efont_cn_10_i  };
-  const U8g2font efontCN_12     = { lgfx_efont_cn_12    };
-  const U8g2font efontCN_12_b   = { lgfx_efont_cn_12_b  };
-  const U8g2font efontCN_12_bi  = { lgfx_efont_cn_12_bi };
-  const U8g2font efontCN_12_i   = { lgfx_efont_cn_12_i  };
-  const U8g2font efontCN_14     = { lgfx_efont_cn_14    };
-  const U8g2font efontCN_14_b   = { lgfx_efont_cn_14_b  };
-  const U8g2font efontCN_14_bi  = { lgfx_efont_cn_14_bi };
-  const U8g2font efontCN_14_i   = { lgfx_efont_cn_14_i  };
-  const U8g2font efontCN_16     = { lgfx_efont_cn_16    };
-  const U8g2font efontCN_16_b   = { lgfx_efont_cn_16_b  };
-  const U8g2font efontCN_16_bi  = { lgfx_efont_cn_16_bi };
-  const U8g2font efontCN_16_i   = { lgfx_efont_cn_16_i  };
-  const U8g2font efontCN_24     = { lgfx_efont_cn_24    };
-  const U8g2font efontCN_24_b   = { lgfx_efont_cn_24_b  };
-  const U8g2font efontCN_24_bi  = { lgfx_efont_cn_24_bi };
-  const U8g2font efontCN_24_i   = { lgfx_efont_cn_24_i  };
+    const U8g2font efontJA_10     = { lgfx_efont_ja_10    };
+    const U8g2font efontJA_10_b   = { lgfx_efont_ja_10_b  };
+    const U8g2font efontJA_10_bi  = { lgfx_efont_ja_10_bi };
+    const U8g2font efontJA_10_i   = { lgfx_efont_ja_10_i  };
+    const U8g2font efontJA_12     = { lgfx_efont_ja_12    };
+    const U8g2font efontJA_12_b   = { lgfx_efont_ja_12_b  };
+    const U8g2font efontJA_12_bi  = { lgfx_efont_ja_12_bi };
+    const U8g2font efontJA_12_i   = { lgfx_efont_ja_12_i  };
+    const U8g2font efontJA_14     = { lgfx_efont_ja_14    };
+    const U8g2font efontJA_14_b   = { lgfx_efont_ja_14_b  };
+    const U8g2font efontJA_14_bi  = { lgfx_efont_ja_14_bi };
+    const U8g2font efontJA_14_i   = { lgfx_efont_ja_14_i  };
+    const U8g2font efontJA_16     = { lgfx_efont_ja_16    };
+    const U8g2font efontJA_16_b   = { lgfx_efont_ja_16_b  };
+    const U8g2font efontJA_16_bi  = { lgfx_efont_ja_16_bi };
+    const U8g2font efontJA_16_i   = { lgfx_efont_ja_16_i  };
+    const U8g2font efontJA_24     = { lgfx_efont_ja_24    };
+    const U8g2font efontJA_24_b   = { lgfx_efont_ja_24_b  };
+    const U8g2font efontJA_24_bi  = { lgfx_efont_ja_24_bi };
+    const U8g2font efontJA_24_i   = { lgfx_efont_ja_24_i  };
 
-  const U8g2font efontJA_10     = { lgfx_efont_ja_10    };
-  const U8g2font efontJA_10_b   = { lgfx_efont_ja_10_b  };
-  const U8g2font efontJA_10_bi  = { lgfx_efont_ja_10_bi };
-  const U8g2font efontJA_10_i   = { lgfx_efont_ja_10_i  };
-  const U8g2font efontJA_12     = { lgfx_efont_ja_12    };
-  const U8g2font efontJA_12_b   = { lgfx_efont_ja_12_b  };
-  const U8g2font efontJA_12_bi  = { lgfx_efont_ja_12_bi };
-  const U8g2font efontJA_12_i   = { lgfx_efont_ja_12_i  };
-  const U8g2font efontJA_14     = { lgfx_efont_ja_14    };
-  const U8g2font efontJA_14_b   = { lgfx_efont_ja_14_b  };
-  const U8g2font efontJA_14_bi  = { lgfx_efont_ja_14_bi };
-  const U8g2font efontJA_14_i   = { lgfx_efont_ja_14_i  };
-  const U8g2font efontJA_16     = { lgfx_efont_ja_16    };
-  const U8g2font efontJA_16_b   = { lgfx_efont_ja_16_b  };
-  const U8g2font efontJA_16_bi  = { lgfx_efont_ja_16_bi };
-  const U8g2font efontJA_16_i   = { lgfx_efont_ja_16_i  };
-  const U8g2font efontJA_24     = { lgfx_efont_ja_24    };
-  const U8g2font efontJA_24_b   = { lgfx_efont_ja_24_b  };
-  const U8g2font efontJA_24_bi  = { lgfx_efont_ja_24_bi };
-  const U8g2font efontJA_24_i   = { lgfx_efont_ja_24_i  };
+    const U8g2font efontKR_10     = { lgfx_efont_kr_10    };
+    const U8g2font efontKR_10_b   = { lgfx_efont_kr_10_b  };
+    const U8g2font efontKR_10_bi  = { lgfx_efont_kr_10_bi };
+    const U8g2font efontKR_10_i   = { lgfx_efont_kr_10_i  };
+    const U8g2font efontKR_12     = { lgfx_efont_kr_12    };
+    const U8g2font efontKR_12_b   = { lgfx_efont_kr_12_b  };
+    const U8g2font efontKR_12_bi  = { lgfx_efont_kr_12_bi };
+    const U8g2font efontKR_12_i   = { lgfx_efont_kr_12_i  };
+    const U8g2font efontKR_14     = { lgfx_efont_kr_14    };
+    const U8g2font efontKR_14_b   = { lgfx_efont_kr_14_b  };
+    const U8g2font efontKR_14_bi  = { lgfx_efont_kr_14_bi };
+    const U8g2font efontKR_14_i   = { lgfx_efont_kr_14_i  };
+    const U8g2font efontKR_16     = { lgfx_efont_kr_16    };
+    const U8g2font efontKR_16_b   = { lgfx_efont_kr_16_b  };
+    const U8g2font efontKR_16_bi  = { lgfx_efont_kr_16_bi };
+    const U8g2font efontKR_16_i   = { lgfx_efont_kr_16_i  };
+    const U8g2font efontKR_24     = { lgfx_efont_kr_24    };
+    const U8g2font efontKR_24_b   = { lgfx_efont_kr_24_b  };
+    const U8g2font efontKR_24_bi  = { lgfx_efont_kr_24_bi };
+    const U8g2font efontKR_24_i   = { lgfx_efont_kr_24_i  };
 
-  const U8g2font efontKR_10     = { lgfx_efont_kr_10    };
-  const U8g2font efontKR_10_b   = { lgfx_efont_kr_10_b  };
-  const U8g2font efontKR_10_bi  = { lgfx_efont_kr_10_bi };
-  const U8g2font efontKR_10_i   = { lgfx_efont_kr_10_i  };
-  const U8g2font efontKR_12     = { lgfx_efont_kr_12    };
-  const U8g2font efontKR_12_b   = { lgfx_efont_kr_12_b  };
-  const U8g2font efontKR_12_bi  = { lgfx_efont_kr_12_bi };
-  const U8g2font efontKR_12_i   = { lgfx_efont_kr_12_i  };
-  const U8g2font efontKR_14     = { lgfx_efont_kr_14    };
-  const U8g2font efontKR_14_b   = { lgfx_efont_kr_14_b  };
-  const U8g2font efontKR_14_bi  = { lgfx_efont_kr_14_bi };
-  const U8g2font efontKR_14_i   = { lgfx_efont_kr_14_i  };
-  const U8g2font efontKR_16     = { lgfx_efont_kr_16    };
-  const U8g2font efontKR_16_b   = { lgfx_efont_kr_16_b  };
-  const U8g2font efontKR_16_bi  = { lgfx_efont_kr_16_bi };
-  const U8g2font efontKR_16_i   = { lgfx_efont_kr_16_i  };
-  const U8g2font efontKR_24     = { lgfx_efont_kr_24    };
-  const U8g2font efontKR_24_b   = { lgfx_efont_kr_24_b  };
-  const U8g2font efontKR_24_bi  = { lgfx_efont_kr_24_bi };
-  const U8g2font efontKR_24_i   = { lgfx_efont_kr_24_i  };
-
-  const U8g2font efontTW_10     = { lgfx_efont_tw_10    };
-  const U8g2font efontTW_10_b   = { lgfx_efont_tw_10_b  };
-  const U8g2font efontTW_10_bi  = { lgfx_efont_tw_10_bi };
-  const U8g2font efontTW_10_i   = { lgfx_efont_tw_10_i  };
-  const U8g2font efontTW_12     = { lgfx_efont_tw_12    };
-  const U8g2font efontTW_12_b   = { lgfx_efont_tw_12_b  };
-  const U8g2font efontTW_12_bi  = { lgfx_efont_tw_12_bi };
-  const U8g2font efontTW_12_i   = { lgfx_efont_tw_12_i  };
-  const U8g2font efontTW_14     = { lgfx_efont_tw_14    };
-  const U8g2font efontTW_14_b   = { lgfx_efont_tw_14_b  };
-  const U8g2font efontTW_14_bi  = { lgfx_efont_tw_14_bi };
-  const U8g2font efontTW_14_i   = { lgfx_efont_tw_14_i  };
-  const U8g2font efontTW_16     = { lgfx_efont_tw_16    };
-  const U8g2font efontTW_16_b   = { lgfx_efont_tw_16_b  };
-  const U8g2font efontTW_16_bi  = { lgfx_efont_tw_16_bi };
-  const U8g2font efontTW_16_i   = { lgfx_efont_tw_16_i  };
-  const U8g2font efontTW_24     = { lgfx_efont_tw_24    };
-  const U8g2font efontTW_24_b   = { lgfx_efont_tw_24_b  };
-  const U8g2font efontTW_24_bi  = { lgfx_efont_tw_24_bi };
-  const U8g2font efontTW_24_i   = { lgfx_efont_tw_24_i  };
+    const U8g2font efontTW_10     = { lgfx_efont_tw_10    };
+    const U8g2font efontTW_10_b   = { lgfx_efont_tw_10_b  };
+    const U8g2font efontTW_10_bi  = { lgfx_efont_tw_10_bi };
+    const U8g2font efontTW_10_i   = { lgfx_efont_tw_10_i  };
+    const U8g2font efontTW_12     = { lgfx_efont_tw_12    };
+    const U8g2font efontTW_12_b   = { lgfx_efont_tw_12_b  };
+    const U8g2font efontTW_12_bi  = { lgfx_efont_tw_12_bi };
+    const U8g2font efontTW_12_i   = { lgfx_efont_tw_12_i  };
+    const U8g2font efontTW_14     = { lgfx_efont_tw_14    };
+    const U8g2font efontTW_14_b   = { lgfx_efont_tw_14_b  };
+    const U8g2font efontTW_14_bi  = { lgfx_efont_tw_14_bi };
+    const U8g2font efontTW_14_i   = { lgfx_efont_tw_14_i  };
+    const U8g2font efontTW_16     = { lgfx_efont_tw_16    };
+    const U8g2font efontTW_16_b   = { lgfx_efont_tw_16_b  };
+    const U8g2font efontTW_16_bi  = { lgfx_efont_tw_16_bi };
+    const U8g2font efontTW_16_i   = { lgfx_efont_tw_16_i  };
+    const U8g2font efontTW_24     = { lgfx_efont_tw_24    };
+    const U8g2font efontTW_24_b   = { lgfx_efont_tw_24_b  };
+    const U8g2font efontTW_24_bi  = { lgfx_efont_tw_24_bi };
+    const U8g2font efontTW_24_i   = { lgfx_efont_tw_24_i  };
+  }
  }
 }
 

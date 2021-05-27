@@ -387,7 +387,7 @@ namespace lgfx
     {
       typeof(dev->command[0]) cmd;
       cmd.val = 0;
-      cmd.ack_en = (op_code == I2C_CMD_WRITE) || (op_code == I2C_CMD_READ);
+      cmd.ack_en = (op_code == I2C_CMD_WRITE); // || (op_code == I2C_CMD_READ);
       cmd.byte_num = byte_num;
       cmd.op_code = op_code;
       dev->command[index].val = cmd.val;
@@ -638,12 +638,7 @@ namespace lgfx
 
       i2c_context[i2c_port].state = i2c_context_t::state_t::state_disconnect;
 
-      auto res = restart(i2c_port, i2c_addr, freq, read);
-
-      i2c_context[i2c_port].state = read ? i2c_context_t::state_t::state_read : i2c_context_t::state_t::state_write;
-      i2c_context[i2c_port].wait_ack = true;
-
-      return res;
+      return restart(i2c_port, i2c_addr, freq, read);
     }
 
     cpp::result<void, error_t> endTransaction(int i2c_port)

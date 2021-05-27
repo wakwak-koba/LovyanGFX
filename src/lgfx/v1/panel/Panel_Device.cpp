@@ -49,7 +49,7 @@ namespace lgfx
     _bus->init();
   }
 
-  void Panel_Device::init(bool use_reset)
+  bool Panel_Device::init(bool use_reset)
   {
     _bus->init();
     init_cs();
@@ -67,6 +67,7 @@ namespace lgfx
       reset();
       delay(50);
     }
+    return true;
   }
 
   void Panel_Device::initDMA(void)

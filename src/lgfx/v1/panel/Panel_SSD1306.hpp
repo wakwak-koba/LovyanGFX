@@ -36,7 +36,7 @@ namespace lgfx
 
     void beginTransaction(void) override;
     void endTransaction(void) override;
-    void init(bool use_reset) override;
+    bool init(bool use_reset) override;
 
     void waitDisplay(void) override;
     bool displayBusy(void) override;
@@ -152,7 +152,7 @@ namespace lgfx
       _auto_display = true;
     }
 
-    void init(bool use_reset) override;
+    bool init(bool use_reset) override;
 
     void beginTransaction(void) override;
 

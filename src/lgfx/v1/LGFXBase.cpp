@@ -40,8 +40,6 @@ namespace lgfx
 
   LGFXBase::LGFXBase(void)
   {
-    static Panel_NULL nullobj;
-    _panel = &nullobj;
   }
 
   void LGFXBase::setColorDepth(color_depth_t depth)
@@ -2834,6 +2832,7 @@ namespace lgfx
 
   LGFX_Device::LGFX_Device(void)
   {
+    setPanel(nullptr);
   }
 
   void LGFX_Device::initBus(void)
@@ -2841,7 +2840,15 @@ namespace lgfx
     panel()->initBus();
   };
 
-  void LGFX_Device::init_impl(bool use_reset, bool use_clear)
+  void LGFX_Device::setPanel(Panel_Device* panel)
+  {
+    static Panel_NULL nullobj;
+    _panel = (nullptr == panel)
+           ? &nullobj
+           : reinterpret_cast<IPanel*>(panel); 
+  }
+
+  bool LGFX_Device::init_impl(bool use_reset, bool use_clear)
   {
     if (_panel)
     {
@@ -2850,19 +2857,23 @@ namespace lgfx
         setBaseColor(TFT_WHITE);
         setTextColor(TFT_BLACK, TFT_WHITE);
       }
-      _panel->init(use_reset);
-      startWrite();
-      invertDisplay(_panel->getInvert());
-      setColorDepth(_panel->getWriteDepth());
-      setRotation(  _panel->getRotation());
-      if (use_clear)
+      if (_panel->init(use_reset))
       {
-        clear();
+        startWrite();
+        invertDisplay(_panel->getInvert());
+        setColorDepth(_panel->getWriteDepth());
+        setRotation(  _panel->getRotation());
+        if (use_clear)
+        {
+          clear();
+        }
+        setPivot(width()>>1, height()>>1);
+        endWrite();
+        setBrightness(_brightness);
+        return true;
       }
-      setPivot(width()>>1, height()>>1);
-      endWrite();
-      setBrightness(_brightness);
     }
+    return false;
   }
 
 //----------------------------------------------------------------------------
