@@ -369,6 +369,76 @@ namespace lgfx
     param->src_y32_add = addy;
   }
 
+  void Panel_Sprite::writePixels(pixelcopy_t* param, std::uint32_t length)
+  {
+    std::uint_fast16_t xs = _xs;
+    std::uint_fast16_t xe = _xe;
+    std::uint_fast16_t ys = _ys;
+    std::uint_fast16_t ye = _ye;
+    std::uint_fast16_t x = _xpos;
+    std::uint_fast16_t y = _ypos;
+    auto k = _bitwidth * _write_bits >> 3;
+
+    std::uint_fast8_t r = _rotation;
+    if (!r)
+    {
+      std::uint_fast16_t linelength;
+      do {
+        linelength = std::min<std::uint_fast16_t>(xe - x + 1, length);
+        param->fp_copy(&_img.img8()[y * k], x, x + linelength, param);
+        if ((x += linelength) > xe)
+        {
+          x = xs;
+          y = (y != ye) ? (y + 1) : ys;
+        }
+      } while (length -= linelength);
+      _xpos = x;
+      _ypos = y;
+      return;
+    }
+
+    std::int_fast16_t ax = 1;
+    std::int_fast16_t ay = 1;
+    if ((1u << r) & 0b10010110) { y = _height - (y + 1); ys = _height - (ys + 1); ye = _height - (ye + 1); ay = -1; }
+    if (r & 2)                  { x = _width  - (x + 1); xs = _width  - (xs + 1); xe = _width  - (xe + 1); ax = -1; }
+    if (r & 1)
+    {
+      do
+      {
+        param->fp_copy(&_img.img8()[x * k], y, y + 1, param); /// xとyを入れ替えて処理する
+        if (x != xe)
+        {
+          x += ax;
+        }
+        else
+        {
+          x = xs;
+          y = (y != ye) ? (y + ay) : ys;
+        }
+      } while (--length);
+    }
+    else
+    {
+      do
+      {
+        param->fp_copy(&_img.img8()[y * k], x, x + 1, param);
+        if (x != xe)
+        {
+          x += ax;
+        }
+        else
+        {
+          x = xs;
+          y = (y != ye) ? (y + ay) : ys;
+        }
+      } while (--length);
+    }
+    if ((1u << r) & 0b10010110) { y = _height - (y + 1); }
+    if (r & 2)                  { x = _width  - (x + 1); }
+    _xpos = x;
+    _ypos = y;
+  }
+
   void Panel_Sprite::writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool)
   {
     std::uint_fast8_t r = _rotation;

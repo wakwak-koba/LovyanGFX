@@ -71,15 +71,11 @@ namespace lgfx
     color_depth_t setColorDepth(color_depth_t depth) override;
     void setRotation(std::uint_fast8_t r) override;
 
-
-    /// ToDo implement
-    void writePixels(pixelcopy_t* param, std::uint32_t len) override {}
-
-
     void setWindow(std::uint_fast16_t xs, std::uint_fast16_t ys, std::uint_fast16_t xe, std::uint_fast16_t ye) override;
     void drawPixelPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint32_t rawcolor) override;
     void writeFillRectPreclipped(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, std::uint32_t raw_color) override;
     void writeBlock(std::uint32_t rawcolor, std::uint32_t len) override;
+    void writePixels(pixelcopy_t* param, std::uint32_t len) override;
     void writeImage(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param, bool) override;
     void writeImageARGB(std::uint_fast16_t x, std::uint_fast16_t y, std::uint_fast16_t w, std::uint_fast16_t h, pixelcopy_t* param) override;
 

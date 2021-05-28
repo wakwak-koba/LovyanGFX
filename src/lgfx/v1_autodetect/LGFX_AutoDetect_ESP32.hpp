@@ -513,6 +513,234 @@ namespace lgfx
       }
 #endif
 
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_TTGO_TS )
+
+      if (board == 0 || board == board_t::board_TTGO_TS)
+      {
+        bus_cfg.pin_mosi = 23;
+        bus_cfg.pin_miso = -1;
+        bus_cfg.pin_sclk =  5;
+        bus_cfg.pin_dc   = 17;
+        bus_cfg.spi_3wire = true;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        _pin_reset(9, use_reset); // LCD RST
+        id = _read_panel_id(&_bus_spi, 16);
+        if ((id & 0xFF) == 0x7C)
+        {  //  check panel (ST7735)
+          board = board_t::board_TTGO_TS;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] TTGO TS");
+          bus_cfg.freq_write = 20000000;
+          bus_cfg.freq_read  = 14000000;
+          _bus_spi.config(bus_cfg);
+          auto p = new Panel_ST7735S();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.pin_cs  = 16;
+            cfg.pin_rst =  9;
+            cfg.panel_width  = 128;
+            cfg.panel_height = 160;
+            cfg.offset_x     = 2;
+            cfg.offset_y     = 1;
+            cfg.offset_rotation = 2;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          _set_pwm_backlight(27, 7, 12000);
+          goto init_clear;
+        }
+        lgfx::pinMode( 9, lgfx::pin_mode_t::input); // LCD RST
+        lgfx::pinMode(16, lgfx::pin_mode_t::input); // LCD CS
+        _bus_spi.release();
+      }
+#endif
+
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_WIFIBOY_MINI )
+
+      if (board == 0 || board == board_t::board_WiFiBoy_Mini)
+      {
+        bus_cfg.pin_mosi = 13;
+        bus_cfg.pin_miso = 12;
+        bus_cfg.pin_sclk = 14;
+        bus_cfg.pin_dc   =  4;
+        bus_cfg.spi_3wire = true;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        id = _read_panel_id(&_bus_spi, 15);
+        if ((id & 0xFF) == 0x7C)
+        {  //  check panel (ST7735)
+          board = board_t::board_WiFiBoy_Mini;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] WiFiBoy mini");
+          _bus_spi.release();
+          bus_cfg.spi_host = HSPI_HOST;
+          bus_cfg.freq_write = 20000000;
+          bus_cfg.freq_read  =  8000000;
+          _bus_spi.config(bus_cfg);
+          _bus_spi.init();
+          auto p = new Panel_ST7735S();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.pin_cs  = 15;
+            cfg.pin_rst = -1;
+            cfg.panel_width  = 128;
+            cfg.panel_height = 128;
+            cfg.memory_width  = 132;
+            cfg.memory_height = 132;
+            cfg.offset_x     = 2;
+            cfg.offset_y     = 1;
+            cfg.offset_rotation = 2;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          _set_pwm_backlight(27, 7, 12000);
+          goto init_clear;
+        }
+        lgfx::pinMode(15, lgfx::pin_mode_t::input); // LCD CS
+        _bus_spi.release();
+      }
+#endif
+
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_WIFIBOY_PRO )
+
+      if (board == 0 || board == board_t::board_WiFiBoy_Pro)
+      {
+        bus_cfg.pin_mosi = 13;
+        bus_cfg.pin_miso = 12;
+        bus_cfg.pin_sclk = 14;
+        bus_cfg.pin_dc   =  4;
+        bus_cfg.spi_3wire = false;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        id = _read_panel_id(&_bus_spi, 15);
+        if ((id & 0xFF) == 0 && _read_panel_id(&_bus_spi, 15, 0x09) != 0)
+        {   // check panel (ILI9341) panelIDが0なのでステータスリード0x09を併用する
+          board = board_t::board_WiFiBoy_Pro;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] WiFiBoy Pro");
+          _bus_spi.release();
+          bus_cfg.spi_host = HSPI_HOST;
+          bus_cfg.freq_write = 40000000;
+          bus_cfg.freq_read  = 16000000;
+          _bus_spi.config(bus_cfg);
+          _bus_spi.init();
+          auto p = new Panel_ILI9341();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.pin_cs  = 15;
+            cfg.pin_rst = -1;
+            cfg.offset_rotation = 2;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          _set_pwm_backlight(27, 7, 12000);
+          goto init_clear;
+        }
+        lgfx::pinMode(15, lgfx::pin_mode_t::input); // LCD CS
+        _bus_spi.release();
+      }
+#endif
+
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_MAKERFABS_TOUCHCAMERA )
+
+      if (board == 0 || board == board_t::board_Makerfabs_TouchCamera)
+      {
+        bus_cfg.pin_mosi = 13;
+        bus_cfg.pin_miso = 12;
+        bus_cfg.pin_sclk = 14;
+        bus_cfg.pin_dc   = 33;
+        bus_cfg.spi_3wire = false;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        _pin_level( 4, true); // TF card CS
+
+        id = _read_panel_id(&_bus_spi, 15);
+        if ((id & 0xFF) == 0x54)
+        { // check panel (ILI9488)
+          board = board_t::board_Makerfabs_TouchCamera;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] Makerfabs_TouchCamera");
+          bus_cfg.freq_write = 40000000;
+          bus_cfg.freq_read  = 16000000;
+          _bus_spi.config(bus_cfg);
+          auto p = new Panel_ILI9488();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.pin_cs  = 15;
+            cfg.pin_rst = -1;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          {
+            auto t = new lgfx::Touch_FT5x06();
+            auto cfg = t->config();
+            cfg.pin_int  = 38;   // INT pin number
+            cfg.pin_sda  = 26;   // I2C SDA pin number
+            cfg.pin_scl  = 27;   // I2C SCL pin number
+            cfg.i2c_addr = 0x38; // I2C device addr
+            cfg.i2c_port = I2C_NUM_1;// I2C port number
+            cfg.freq = 400000;   // I2C freq
+            cfg.x_min = 0;
+            cfg.x_max = 319;
+            cfg.y_min = 0;
+            cfg.y_max = 479;
+            t->config(cfg);
+            p->touch(t);
+
+            _touch_last = t;
+          }
+          goto init_clear;
+        }
+        lgfx::pinMode(15, lgfx::pin_mode_t::input); // LCD CS
+        lgfx::pinMode( 4, lgfx::pin_mode_t::input); // TF card CS
+        _bus_spi.release();
+      }
+#endif
+
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_MAKERFABS_MAKEPYTHON )
+
+      if (board == 0 || board == board_t::board_Makerfabs_MakePython)
+      {
+        bus_cfg.pin_mosi = 13;
+        bus_cfg.pin_miso = 12;
+        bus_cfg.pin_sclk = 14;
+        bus_cfg.pin_dc   = 22;
+        bus_cfg.spi_3wire = true;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        _pin_reset(21, use_reset); // LCD RST
+        id = _read_panel_id(&_bus_spi, 15);
+        if ((id & 0xFF) == 0x85)
+        {  //  check panel (ST7789)
+          board = board_t::board_Makerfabs_MakePython;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] Makerfabs_Makepython");
+          _bus_spi.release();
+          bus_cfg.spi_host = HSPI_HOST;
+          bus_cfg.freq_write = 80000000;
+          bus_cfg.freq_read  = 14000000;
+          _bus_spi.config(bus_cfg);
+          _bus_spi.init();
+          auto p = new Panel_ST7789();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.invert = true;
+            cfg.pin_cs  = 15;
+            cfg.pin_rst = 21;
+            cfg.panel_height = 240;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          _set_pwm_backlight(5, 7, 12000);
+          goto init_clear;
+        }
+        lgfx::pinMode(15, lgfx::pin_mode_t::input); // LCD CS
+        lgfx::pinMode(21, lgfx::pin_mode_t::input); // LCD RST
+        _bus_spi.release();
+      }
+#endif
+
 #if defined ( LGFX_AUTODETECT ) || defined ( LGFX_ESP_WROVER_KIT )
 
       if (board == 0 || board == board_t::board_ESP_WROVER_KIT)
@@ -693,16 +921,6 @@ namespace lgfx
             _panel_last = p;
             _set_pwm_backlight(32, 7, 44100);
 
-/*          auto t = new lgfx::Touch_XPT2046();
-            t->spi_mosi = 23;
-            t->spi_miso = 19;
-            t->spi_sclk = 18;
-            t->spi_cs   = 12;
-            t->spi_host = VSPI_HOST;
-            t->bus_shared = true;
-            t->freq     = 2500000;
-            touch(t);
-*/
             {
               auto t = new lgfx::Touch_XPT2046();
               auto cfg = t->config();
@@ -998,7 +1216,111 @@ namespace lgfx
           _bus_spi.release();
         }
       }
+#endif
 
+#if defined ( LGFX_AUTODETECT ) || defined ( LGFX_WT32_SC01 )
+
+      if (board == 0 || board == board_t::board_WT32_SC01)
+      {
+        bus_cfg.pin_mosi = 13;
+        bus_cfg.pin_miso = -1;
+        bus_cfg.pin_sclk = 14;
+        bus_cfg.pin_dc   = 21;
+        bus_cfg.spi_3wire = true;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        _pin_reset(22, use_reset); // LCD RST
+
+        id = _read_panel_id(&_bus_spi, 15);
+        if (id == 0)
+        { // 読出しが出来ない製品のため 0 判定
+          lgfx::i2c::init(I2C_NUM_1, 18, 19);
+          // I2C通信でタッチパネルコントローラが存在するかチェックする
+          if (0x11 == lgfx::i2c::registerRead8(I2C_NUM_1, 0x38, 0xA8, 400000))
+          { /// FocalTech's Panel ID reg=0xA8  value=0x11
+            board = board_t::board_WT32_SC01;
+            ESP_LOGW(LIBRARY_NAME, "[Autodetect] WT32-SC01");
+            bus_cfg.freq_write = 40000000;
+            _bus_spi.config(bus_cfg);
+            auto p = new Panel_ST7796();
+            p->bus(&_bus_spi);
+            {
+              auto cfg = p->config();
+              cfg.pin_cs  = 15;
+              cfg.pin_rst = 22;
+              cfg.readable = false;
+              p->config(cfg);
+            }
+            _panel_last = p;
+            _set_pwm_backlight(23, 7);
+
+            auto t = new lgfx::Touch_FT5x06();
+            {
+              auto cfg = t->config();
+              cfg.pin_int  = 39;   // INT pin number
+              cfg.pin_sda  = 18;   // I2C SDA pin number
+              cfg.pin_scl  = 19;   // I2C SCL pin number
+              cfg.i2c_addr = 0x38; // I2C device addr
+              cfg.i2c_port = I2C_NUM_1;// I2C port number
+              cfg.freq = 400000;   // I2C freq
+              cfg.x_min = 0;
+              cfg.x_max = 319;
+              cfg.y_min = 0;
+              cfg.y_max = 479;
+              t->config(cfg);
+              p->touch(t);
+
+              _touch_last = t;
+            }
+            goto init_clear;
+          }
+          lgfx::i2c::release(I2C_NUM_1);
+        }
+        lgfx::pinMode(15, lgfx::pin_mode_t::input); // LCD CS
+        lgfx::pinMode(22, lgfx::pin_mode_t::input); // LCD RST
+        _bus_spi.release();
+      }
+#endif
+
+  // DSTIKE D-Duino32XS については読出しが出来ないため無条件設定となる。
+  // そのためLGFX_AUTO_DETECTでは機能しないようにしておく。
+#if defined ( LGFX_DDUINO32_XS )
+
+      if (board == 0 || board == board_t::board_DDUINO32_XS)
+      {
+        bus_cfg.pin_mosi = 26;
+        bus_cfg.pin_miso = -1;
+        bus_cfg.pin_sclk = 27;
+        bus_cfg.pin_dc   = 23;
+        bus_cfg.spi_3wire = true;
+        _bus_spi.config(bus_cfg);
+        _bus_spi.init();
+        _pin_reset(32, use_reset); // LCD RST
+        id = _read_panel_id(&_bus_spi, -1);
+        if (id == 0)
+        { // 読出しが出来ない製品のため 0 判定
+          board = board_t::board_DDUINO32_XS;
+          ESP_LOGW(LIBRARY_NAME, "[Autodetect] D-Duino32 XS");
+          bus_cfg.freq_write = 80000000;
+          _bus_spi.config(bus_cfg);
+          auto p = new Panel_ST7789();
+          p->bus(&_bus_spi);
+          {
+            auto cfg = p->config();
+            cfg.invert = true;
+            cfg.readable  = false;
+            cfg.pin_cs  = -1;
+            cfg.pin_rst = 32;
+            cfg.panel_height = 240;
+            p->config(cfg);
+          }
+          _panel_last = p;
+          _set_pwm_backlight(22, 7, 12000);
+          goto init_clear;
+        }
+        lgfx::pinMode(32, lgfx::pin_mode_t::input); // LCD RST
+        _bus_spi.release();
+      }
 #endif
 
       board = board_t::board_unknown;
