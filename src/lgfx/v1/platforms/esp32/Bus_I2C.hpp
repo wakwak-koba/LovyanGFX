@@ -31,8 +31,8 @@ namespace lgfx
   public:
     struct config_t
     {
-      std::uint32_t freq = 400000;
-      std::uint32_t freq_read = 400000;
+      std::uint32_t freq_write = 400000;
+      std::uint32_t freq_read  = 400000;
       std::int16_t pin_scl = 22;
       std::int16_t pin_sda = 21;
       std::uint8_t i2c_port = 0;      // e.g. ESP32 0=I2C_NUM_0 / 1=I2C_NUM_1

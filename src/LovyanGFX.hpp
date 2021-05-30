@@ -32,7 +32,6 @@ Contributors:
 #undef setFont
 #endif
 
-//#if __has_include("lgfx/v1_init.hpp") && ( defined ( LGFX_AUTODETECT ) || defined ( LGFX_USE_V1 ) || !__has_include("lgfx/v0_init.hpp") )
 #if __has_include("lgfx/v1_init.hpp") && ( defined ( LGFX_USE_V1 ) || !__has_include("lgfx/v0_init.hpp") )
 
  #include "lgfx/v1_init.hpp"

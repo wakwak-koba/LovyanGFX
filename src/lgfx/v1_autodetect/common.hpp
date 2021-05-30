@@ -21,6 +21,8 @@ Contributors:
 #define LGFX_USE_V1
 #endif
 
+#include "LovyanGFX.hpp"
+
 namespace lgfx
 {
  inline namespace v1
