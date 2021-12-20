@@ -212,6 +212,26 @@ namespace lgfx
     __attribute__ ((always_inline)) inline void pushPixels(const uint16_t* data, int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
     __attribute__ ((always_inline)) inline void pushPixels(const void*          data, int32_t len, bool swap) { startWrite(); writePixels(data, len, swap); endWrite(); }
 
+    template<typename TFunc>
+    void effect(std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h, TFunc&& effector)
+    {
+      if (!_clipping(x, y, w, h)) return;
+      auto ye = y + h;
+      RGBColor buf[w];
+      startWrite();
+      do
+      {
+        readRectRGB(x, y, w, 1, buf);
+        std::size_t i = 0;
+        do
+        {
+          effector(x + i, y, buf[i]);
+        } while (++i < w);
+        pushImage(x, y, w, 1, buf);
+      } while (++y < ye);
+      endWrite();
+    }
+
     template<typename T>
     void writePixels(const T *data, int32_t len)                        { auto pc = create_pc_fast(data      ); writePixels_impl(len, &pc); }
     void writePixels(const uint16_t* data, int32_t len, bool swap) { auto pc = create_pc_fast(data, swap); writePixels_impl(len, &pc); }
@@ -767,6 +787,23 @@ namespace lgfx
       if (x < left) { dx = -x; dw += x; x = left; }
       if (dw > left + width - x) dw = left + width  - x;
       return (dw <= 0);
+    }
+
+    bool _clipping(std::int32_t& x, std::int32_t& y, std::int32_t& w, std::int32_t& h)
+    {
+      auto cl = _clip_l;
+      if (x < cl) { w += x - cl; x = cl; }
+      auto cr = _clip_r + 1 - x;
+      if (w > cr) w = cr;
+      if (w < 1) return false;
+
+      auto ct = _clip_t;
+      if (y < ct) { h += y - ct; y = ct; }
+      auto cb = _clip_b + 1 - y;
+      if (h > cb) h = cb;
+      if (h < 1) return false;
+
+      return true;
     }
 
 //----------------------------------------------------------------------------
