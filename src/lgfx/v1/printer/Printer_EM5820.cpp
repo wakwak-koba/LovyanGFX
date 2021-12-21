@@ -15,7 +15,7 @@ Contributors:
  [mongonta0716](https://github.com/mongonta0716)
  [tobozo](https://github.com/tobozo)
 /----------------------------------------------------------------------------*/
-#include "Printer_DPEH600.hpp"
+#include "Printer_EM5820.hpp"
 #include "../Bus.hpp"
 #include "../platforms/common.hpp"
 #include "../misc/pixelcopy.hpp"
@@ -33,15 +33,14 @@ namespace lgfx
 
   static constexpr uint8_t Bayer[16] = { 8, 200, 40, 232, 72, 136, 104, 168, 56, 248, 24, 216, 120, 184, 88, 152 };
 
-  Printer_DPEH600::Printer_DPEH600(void)
+  Printer_EM5820::Printer_EM5820(void)
   {
 //  _cfg.dummy_read_bits = 0;
 //  _epd_mode = epd_mode_t::epd_quality;
     _cfg.memory_width  = _cfg.panel_width  = 384;
-    _cfg.memory_height = _cfg.panel_height = 192;
   }
 
-  color_depth_t Printer_DPEH600::setColorDepth(color_depth_t depth)
+  color_depth_t Printer_EM5820::setColorDepth(color_depth_t depth)
   {
 //  _write_bits = 8;
 //  _read_bits = 8;
@@ -55,12 +54,12 @@ namespace lgfx
     return color_depth_t::rgb565_2Byte;
   }
 
-  size_t Printer_DPEH600::_get_buffer_length(void) const
+  size_t Printer_EM5820::_get_buffer_length(void) const
   {
     return ((_cfg.panel_width + 7) & ~7) * _cfg.panel_height >> 3;
   }
 
-  bool Printer_DPEH600::init(bool use_reset)
+  bool Printer_EM5820::init(bool use_reset)
   {
     if(_cfg.pin_busy >= 0)
       pinMode(_cfg.pin_busy, pin_mode_t::input);
@@ -80,17 +79,17 @@ namespace lgfx
     return true;
   }
 
-  void Printer_DPEH600::waitDisplay(void)
+  void Printer_EM5820::waitDisplay(void)
   {
     _wait_busy();
   }
 
-  bool Printer_DPEH600::displayBusy(void)
+  bool Printer_EM5820::displayBusy(void)
   {
     return _cfg.pin_busy >= 0 && gpio_in(_cfg.pin_busy);
   }
 
-  void Printer_DPEH600::display(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h)
+  void Printer_EM5820::display(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h)
   {
     w = (_cfg.panel_width + 7) >> 3;    // 8dots = 1bytes
     h = _cfg.panel_height;
@@ -101,24 +100,24 @@ namespace lgfx
       for(uint8_t x = 0; x < w; x++) {
         uint8_t dt = _invert ? 0xff : 0x00;
         for(uint8_t b = 0; b < 8; b++)
-          if(_read_pixel((x << 3) | b, y))
+          if(!_read_pixel((x << 3) | b, y))
               dt ^= 0x01 << (7 - b);
         writeBytes(&dt, 1);
       }
     }
   }
 
-  void Printer_DPEH600::setInvert(bool invert)
+  void Printer_EM5820::setInvert(bool invert)
   {
     _invert = invert;
   }
 
-  void Printer_DPEH600::writeBytes(const uint8_t* data, uint32_t length) {
+  void Printer_EM5820::writeBytes(const uint8_t* data, uint32_t length) {
     _wait_busy();
     _bus->writeBytes(data, length, true, true);
   }
   
-  void Printer_DPEH600::writeFillRectPreclipped(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, uint32_t rawcolor)
+  void Printer_EM5820::writeFillRectPreclipped(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, uint32_t rawcolor)
   {
     uint_fast16_t xs = x, xe = x + w - 1;
     uint_fast16_t ys = y, ye = y + h - 1;
@@ -148,7 +147,7 @@ namespace lgfx
     } while (++y <= ye);
   }
 
-  void Printer_DPEH600::writeImage(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, pixelcopy_t* param, bool use_dma)
+  void Printer_EM5820::writeImage(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, pixelcopy_t* param, bool use_dma)
   {
     uint_fast16_t xs = x, xe = x + w - 1;
     uint_fast16_t ys = y, ye = y + h - 1;
@@ -177,7 +176,7 @@ namespace lgfx
     } while (++y < h);
   }
 
-  void Printer_DPEH600::writePixels(pixelcopy_t* param, uint32_t length, bool use_dma)
+  void Printer_EM5820::writePixels(pixelcopy_t* param, uint32_t length, bool use_dma)
   {
     {
       uint_fast16_t xs = _xs;
@@ -217,7 +216,7 @@ namespace lgfx
     _ypos = ypos;
   }
 
-  void Printer_DPEH600::readRect(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, void* dst, pixelcopy_t* param)
+  void Printer_EM5820::readRect(uint_fast16_t x, uint_fast16_t y, uint_fast16_t w, uint_fast16_t h, void* dst, pixelcopy_t* param)
   {
     auto readbuf = (swap565_t*)alloca(w * sizeof(swap565_t));
     param->src_data = readbuf;
@@ -235,7 +234,7 @@ namespace lgfx
     } while (++y < h);
   }
 
-  bool Printer_DPEH600::_wait_busy(uint32_t timeout)
+  bool Printer_EM5820::_wait_busy(uint32_t timeout)
   {
     if (displayBusy())
     {
@@ -249,7 +248,7 @@ namespace lgfx
     return true;
   }
 
-  void Printer_DPEH600::_draw_pixel(uint_fast16_t x, uint_fast16_t y, uint32_t value)
+  void Printer_EM5820::_draw_pixel(uint_fast16_t x, uint_fast16_t y, uint32_t value)
   {
     _rotate_pos(x, y);
     uint32_t idx = ((_cfg.panel_width + 7) & ~7) * y + x;
@@ -258,7 +257,7 @@ namespace lgfx
     else     _buf[idx >> 3] &= ~(0x80 >> (idx & 7));
   }
 
-  bool Printer_DPEH600::_read_pixel(uint_fast16_t x, uint_fast16_t y)
+  bool Printer_EM5820::_read_pixel(uint_fast16_t x, uint_fast16_t y)
   {
     _rotate_pos(x, y);
     uint32_t idx = ((_cfg.panel_width + 7) & ~7) * y + x;

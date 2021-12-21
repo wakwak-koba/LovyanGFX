@@ -26,9 +26,9 @@ namespace lgfx
  {
 //----------------------------------------------------------------------------
 
-  struct Printer_DPEH600 : public Panel_HasBuffer
+  struct Printer_EM5820 : public Panel_HasBuffer
   {
-    Printer_DPEH600(void);
+    Printer_EM5820(void);
 
     bool init(bool use_reset) override;
 
